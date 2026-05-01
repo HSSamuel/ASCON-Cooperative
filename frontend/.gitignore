@@ -39,3 +39,16 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Dependency directories
+node_modules/
+
+# Next.js build output
+.next/
+
+# Secret Environment Variables (CRITICAL)
+.env
+.env.local
+
+# Mac system files
+.DS_Store
