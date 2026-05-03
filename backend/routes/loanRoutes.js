@@ -219,7 +219,7 @@ router.put("/:id/review", protect, admin, async (req, res) => {
 
     // Write this action to the Immutable Audit Ledger
     logAdminAction(
-      req.user._id,
+      req.user.id || req.user._id,
       status === "APPROVED" ? "APPROVED_LOAN" : "REJECTED_LOAN",
       `${status === "APPROVED" ? "Approved" : "Rejected"} a loan of ₦${(loan.amountRequested / 100).toLocaleString()} for ${loan.cooperatorId.fileNumber}`,
       loan._id,

@@ -132,7 +132,7 @@ router.post("/admin-adjust", protect, admin, async (req, res) => {
 
     // 🚀 AUDIT: Log manual ledger adjustments
     logAdminAction(
-      req.user._id,
+      req.user.id || req.user._id,
       "MANUAL_LEDGER_ADJUSTMENT",
       `Manually ${type.toLowerCase()}ed ₦${(amountInKobo / 100).toLocaleString()} for ${account.cooperatorId.fileNumber}`,
       account.cooperatorId._id,
@@ -184,7 +184,7 @@ router.put(
 
       // 🚀 AUDIT: Log the override
       logAdminAction(
-        req.user._id,
+        req.user.id || req.user._id,
         "CREDIT_LIMIT_OVERRIDE",
         `Overrode credit limit to ₦${(newCreditLimitInKobo / 100).toLocaleString()} for ${account.cooperatorId.fileNumber}`,
         account.cooperatorId._id,
@@ -276,7 +276,7 @@ router.post("/run-reconciliation", protect, admin, async (req, res) => {
 
     // 🚀 AUDIT: Log the massive reconciliation action
     logAdminAction(
-      req.user._id,
+      req.user.id || req.user._id,
       "RAN_MONTHLY_RECONCILIATION",
       `Processed monthly reconciliation for ${accounts.length} accounts and ${loansProcessed} loans.`,
     );
@@ -326,7 +326,7 @@ router.put("/user/:cooperatorId/settings", protect, admin, async (req, res) => {
 
     // 🚀 AUDIT: Log settings updates
     logAdminAction(
-      req.user._id,
+      req.user.id || req.user._id,
       "UPDATED_ACCOUNT_SETTINGS",
       `Updated settings for ${account.cooperatorId.fileNumber}. Status: ${status}`,
       account.cooperatorId._id,
