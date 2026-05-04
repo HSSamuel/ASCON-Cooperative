@@ -13,73 +13,94 @@ import { logAdminAction } from "../utils/auditLogger.js";
 
 const router = express.Router();
 
-// @route   POST /api/loans/request
-// @desc    Submit a new loan application with guarantors
-// @access  Private
+// @route   POST /api/loans/request
+// @desc    Submit a new loan application with guarantors
+// @access  Private
 router.post("/request", protect, async (req, res) => {
   try {
-    const { amountInKobo, guarantor1FileNumber, guarantor2FileNumber } = req.body;
+    const { amountInKobo, guarantor1FileNumber, guarantor2FileNumber } =
+      req.body;
 
-    // 1. Basic Validation
     if (!amountInKobo || amountInKobo <= 0) {
       return res.status(400).json({ message: "Invalid loan amount." });
     }
     if (!guarantor1FileNumber || !guarantor2FileNumber) {
-      return res.status(400).json({ message: "Two guarantors are strictly required." });
+      return res
+        .status(400)
+        .json({ message: "Two guarantors are strictly required." });
     }
     if (guarantor1FileNumber === guarantor2FileNumber) {
-      return res.status(400).json({ message: "You must provide two different guarantors." });
-    }
+      return res
+        .status(400)
+        .json({ message: "You must provide two different guarantors." });
+    } // Grab the current user to check their join date
 
-    // 2. PERMANENT AUTO-SYNC FIX (Replaces old account check)
-    let account = await Account.findOne({ cooperatorId: req.user._id });
+    const currentUser = await Cooperator.findById(req.user._id); // =====================================================================
+    // 🚀 BUSINESS RULE: 6-MONTH PROBATION PERIOD
+    // Currently commented out for testing. Delete the /* and */ to activate in production.
+    // =====================================================================
+    /*
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    
+    if (currentUser.createdAt > sixMonthsAgo) {
+      return res.status(400).json({ 
+        message: "Loan denied. You must be an active cooperative member for at least 6 months before requesting a loan." 
+      });
+    }
+    */ // =====================================================================
+    // --- THE NEW FLAWLESS ACCOUNT VALIDATION ---
+
+    const account = await Account.findOne({ cooperatorId: req.user._id }); // Check 1: Prevent systemic errors if a legacy test account is missing
 
     if (!account) {
-      console.log(`Auto-creating missing profile for user: ${req.user._id}`);
-      account = new Account({
-        cooperatorId: req.user._id,
-        totalSavings: 0,
-        availableCreditLimit: 0,
+      return res.status(400).json({
+        message:
+          "Financial profile missing. Please contact Admin to sync your account.",
       });
-      await account.save();
-    }
+    } // Check 2: Actual business logic validation
 
-    // 3. Business Logic Validation
     if (amountInKobo > account.availableCreditLimit) {
       return res.status(400).json({
         message: `Request exceeds your available credit limit of ₦${(account.availableCreditLimit / 100).toLocaleString()}.`,
       });
-    }
-
+    } // -------------------------------------------
     const existingPending = await Loan.findOne({
       cooperatorId: req.user._id,
       status: { $in: ["PENDING_GUARANTORS", "PENDING_ADMIN", "APPROVED"] },
     });
     if (existingPending) {
-      return res.status(400).json({ message: "You already have an active or pending loan." });
+      return res
+        .status(400)
+        .json({ message: "You already have an active or pending loan." });
     }
 
-    // 4. Guarantor Validation
     const g1 = await Cooperator.findOne({ fileNumber: guarantor1FileNumber });
     const g2 = await Cooperator.findOne({ fileNumber: guarantor2FileNumber });
 
     if (!g1 || !g2) {
-      return res.status(404).json({ message: "One or both guarantor file numbers are invalid." });
+      return res
+        .status(404)
+        .json({ message: "One or both guarantor file numbers are invalid." });
     }
-    if (g1._id.toString() === req.user._id.toString() || g2._id.toString() === req.user._id.toString()) {
-      return res.status(400).json({ message: "You cannot guarantee your own loan." });
+    if (
+      g1._id.toString() === req.user._id.toString() ||
+      g2._id.toString() === req.user._id.toString()
+    ) {
+      return res
+        .status(400)
+        .json({ message: "You cannot guarantee your own loan." });
     }
 
-    // 5. Create Loan
-    const interestRate = 5; 
+    const interestRate = 5; // 5% flat rate
     const interestAmount = Math.round(amountInKobo * (interestRate / 100));
     const amountDue = amountInKobo + interestAmount;
 
     const newLoan = new Loan({
       cooperatorId: req.user._id,
       amountRequested: amountInKobo,
-      interestRate,
-      amountDue,
+      interestRate: interestRate,
+      amountDue: amountDue,
       guarantor1: { cooperatorId: g1._id },
       guarantor2: { cooperatorId: g2._id },
       status: "PENDING_GUARANTORS",
@@ -87,9 +108,18 @@ router.post("/request", protect, async (req, res) => {
 
     await newLoan.save();
 
-    // 6. Communications & Notifications
-    sendGuarantorRequestEmail(g1.email, req.user.firstName, amountInKobo, newLoan._id);
-    sendGuarantorRequestEmail(g2.email, req.user.firstName, amountInKobo, newLoan._id);
+    sendGuarantorRequestEmail(
+      g1.email,
+      req.user.firstName,
+      amountInKobo,
+      newLoan._id,
+    );
+    sendGuarantorRequestEmail(
+      g2.email,
+      req.user.firstName,
+      amountInKobo,
+      newLoan._id,
+    ); // Save persistent notifications to the database
 
     await Notification.create([
       {
@@ -104,7 +134,22 @@ router.post("/request", protect, async (req, res) => {
         message: `${req.user.firstName} requested you as a guarantor for a loan of ₦${(amountInKobo / 100).toLocaleString()}.`,
         type: "info",
       },
-    ]);
+    ]); // Trigger Live WebSockets if the guarantors are online
+
+    const io = req.app.get("io");
+    const onlineUsers = req.app.get("onlineUsers");
+
+    if (io && onlineUsers) {
+      const g1Socket = onlineUsers.get(g1._id.toString());
+      const g2Socket = onlineUsers.get(g2._id.toString());
+
+      const liveMessage = `${req.user.firstName} just requested you as a loan guarantor.`;
+
+      if (g1Socket)
+        io.to(g1Socket).emit("new_guarantor_request", { message: liveMessage });
+      if (g2Socket)
+        io.to(g2Socket).emit("new_guarantor_request", { message: liveMessage });
+    }
 
     res.status(201).json({
       message: "Loan submitted. Waiting for guarantors to accept.",
@@ -116,9 +161,9 @@ router.post("/request", protect, async (req, res) => {
   }
 });
 
-// @route   GET /api/loans/my-loans
-// @desc    Get all loans for the logged-in user
-// @access  Private
+// @route   GET /api/loans/my-loans
+// @desc    Get all loans for the logged-in user
+// @access  Private
 router.get("/my-loans", protect, async (req, res) => {
   try {
     const loans = await Loan.find({ cooperatorId: req.user._id })
@@ -133,9 +178,9 @@ router.get("/my-loans", protect, async (req, res) => {
   }
 });
 
-// @route   GET /api/loans/all
-// @desc    Get all loans (for Admin Dashboard)
-// @access  Private/Admin
+// @route   GET /api/loans/all
+// @desc    Get all loans (for Admin Dashboard)
+// @access  Private/Admin
 router.get("/all", protect, admin, async (req, res) => {
   try {
     const loans = await Loan.find({})
@@ -151,9 +196,9 @@ router.get("/all", protect, admin, async (req, res) => {
   }
 });
 
-// @route   PUT /api/loans/:id/review
-// @desc    Approve or Reject a loan
-// @access  Private/Admin
+// @route   PUT /api/loans/:id/review
+// @desc    Approve or Reject a loan
+// @access  Private/Admin
 router.put("/:id/review", protect, admin, async (req, res) => {
   try {
     const { status, adminComment } = req.body;
@@ -172,17 +217,15 @@ router.put("/:id/review", protect, admin, async (req, res) => {
       loan.adminComment = adminComment;
     }
 
-    await loan.save();
+    await loan.save(); // Write this action to the Immutable Audit Ledger
 
-    // Write this action to the Immutable Audit Ledger
     logAdminAction(
       req.user.id || req.user._id,
       status === "APPROVED" ? "APPROVED_LOAN" : "REJECTED_LOAN",
       `${status === "APPROVED" ? "Approved" : "Rejected"} a loan of ₦${(loan.amountRequested / 100).toLocaleString()} for ${loan.cooperatorId.fileNumber}`,
       loan._id,
-    );
+    ); // Send email to the applicant
 
-    // Send email to the applicant
     if (loan.cooperatorId && loan.cooperatorId.email) {
       sendLoanStatusEmail(
         loan.cooperatorId.email,
@@ -190,9 +233,8 @@ router.put("/:id/review", protect, admin, async (req, res) => {
         status,
         loan.amountRequested,
       );
-    }
+    } // Notify the applicant in-app of the Admin's decision
 
-    // Notify the applicant in-app of the Admin's decision
     await Notification.create({
       user: loan.cooperatorId._id,
       title: `Loan ${status === "APPROVED" ? "Approved" : "Rejected"}`,
@@ -210,9 +252,9 @@ router.put("/:id/review", protect, admin, async (req, res) => {
   }
 });
 
-// @route   POST /api/loans/:id/repay
-// @desc    Make a payment towards an approved loan
-// @access  Private (Requires Token)
+// @route   POST /api/loans/:id/repay
+// @desc    Make a payment towards an approved loan
+// @access  Private (Requires Token)
 router.post("/:id/repay", protect, async (req, res) => {
   try {
     const { amountInKobo } = req.body;
@@ -245,9 +287,8 @@ router.post("/:id/repay", protect, async (req, res) => {
       loan.amountRepaid = targetRepayment;
     }
 
-    await loan.save();
+    await loan.save(); // Send a financial alert for the receipt
 
-    // Send a financial alert for the receipt
     await Notification.create({
       user: req.user._id,
       title:
@@ -267,9 +308,9 @@ router.post("/:id/repay", protect, async (req, res) => {
   }
 });
 
-// @route   GET /api/loans/guarantor-requests
-// @desc    Get all loans where the logged-in user is asked to be a guarantor
-// @access  Private
+// @route   GET /api/loans/guarantor-requests
+// @desc    Get all loans where the logged-in user is asked to be a guarantor
+// @access  Private
 router.get("/guarantor-requests", protect, async (req, res) => {
   try {
     const requests = await Loan.find({
@@ -293,9 +334,9 @@ router.get("/guarantor-requests", protect, async (req, res) => {
   }
 });
 
-// @route   PUT /api/loans/:id/guarantee
-// @desc    Accept or Decline a guarantor request
-// @access  Private
+// @route   PUT /api/loans/:id/guarantee
+// @desc    Accept or Decline a guarantor request
+// @access  Private
 router.put("/:id/guarantee", protect, async (req, res) => {
   try {
     const { action } = req.body;
@@ -324,9 +365,8 @@ router.put("/:id/guarantee", protect, async (req, res) => {
       loan.guarantor1.status === "ACCEPTED" &&
       loan.guarantor2.status === "ACCEPTED"
     ) {
-      loan.status = "PENDING_ADMIN";
+      loan.status = "PENDING_ADMIN"; // Fire email to all Admins since it is now ready for review
 
-      // Fire email to all Admins since it is now ready for review
       const admins = await Cooperator.find({
         role: { $in: ["ADMIN", "SUPER_ADMIN"] },
       });
@@ -344,9 +384,8 @@ router.put("/:id/guarantee", protect, async (req, res) => {
         "Rejected automatically: A guarantor declined the risk.";
     }
 
-    await loan.save();
+    await loan.save(); // Notify the applicant of the guarantor's decision
 
-    // Notify the applicant of the guarantor's decision
     await Notification.create({
       user: loan.cooperatorId,
       title: `Guarantor ${action === "ACCEPTED" ? "Accepted" : "Declined"}`,
@@ -363,9 +402,9 @@ router.put("/:id/guarantee", protect, async (req, res) => {
   }
 });
 
-// @route   GET /api/loans/payroll-report
-// @desc    Generate a CSV file of all active loan balances for HR payroll deduction
-// @access  Private/Admin
+// @route   GET /api/loans/payroll-report
+// @desc    Generate a CSV file of all active loan balances for HR payroll deduction
+// @access  Private/Admin
 router.get("/payroll-report", protect, admin, async (req, res) => {
   try {
     const activeLoans = await Loan.find({ status: "APPROVED" }).populate(
