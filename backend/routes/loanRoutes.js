@@ -6,7 +6,7 @@ import { protect, admin } from "../middleware/authMiddleware.js";
 import {
   sendGuarantorRequestEmail,
   sendLoanStatusEmail,
-  sendAdminApprovalEmail, // Ensure this is imported!
+  sendAdminApprovalEmail,
 } from "../utils/emailService.js";
 import Notification from "../models/Notification.js";
 import { logAdminAction } from "../utils/auditLogger.js";
@@ -18,47 +18,37 @@ const router = express.Router();
 // @access  Private
 router.post("/request", protect, async (req, res) => {
   try {
-    const { amountInKobo, guarantor1FileNumber, guarantor2FileNumber } =
-      req.body;
+    const { amountInKobo, guarantor1FileNumber, guarantor2FileNumber } = req.body;
 
+    // 1. Basic Validation
     if (!amountInKobo || amountInKobo <= 0) {
       return res.status(400).json({ message: "Invalid loan amount." });
     }
     if (!guarantor1FileNumber || !guarantor2FileNumber) {
-      return res
-        .status(400)
-        .json({ message: "Two guarantors are strictly required." });
+      return res.status(400).json({ message: "Two guarantors are strictly required." });
     }
     if (guarantor1FileNumber === guarantor2FileNumber) {
-      return res
-        .status(400)
-        .json({ message: "You must provide two different guarantors." });
+      return res.status(400).json({ message: "You must provide two different guarantors." });
     }
 
-    // Grab the current user to check their join date
-    const currentUser = await Cooperator.findById(req.user._id);
+    // 2. PERMANENT AUTO-SYNC FIX (Replaces old account check)
+    let account = await Account.findOne({ cooperatorId: req.user._id });
 
-    // =====================================================================
-    // 🚀 BUSINESS RULE: 6-MONTH PROBATION PERIOD
-    // Currently commented out for testing. Delete the /* and */ to activate in production.
-    // =====================================================================
-    /*
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-    
-    if (currentUser.createdAt > sixMonthsAgo) {
-      return res.status(400).json({ 
-        message: "Loan denied. You must be an active cooperative member for at least 6 months before requesting a loan." 
+    if (!account) {
+      console.log(`Auto-creating missing profile for user: ${req.user._id}`);
+      account = new Account({
+        cooperatorId: req.user._id,
+        totalSavings: 0,
+        availableCreditLimit: 0,
       });
+      await account.save();
     }
-    */
-    // =====================================================================
 
-    const account = await Account.findOne({ cooperatorId: req.user._id });
-    if (!account || amountInKobo > account.availableCreditLimit) {
-      return res
-        .status(400)
-        .json({ message: "Loan request exceeds your available credit limit." });
+    // 3. Business Logic Validation
+    if (amountInKobo > account.availableCreditLimit) {
+      return res.status(400).json({
+        message: `Request exceeds your available credit limit of ₦${(account.availableCreditLimit / 100).toLocaleString()}.`,
+      });
     }
 
     const existingPending = await Loan.findOne({
@@ -66,37 +56,30 @@ router.post("/request", protect, async (req, res) => {
       status: { $in: ["PENDING_GUARANTORS", "PENDING_ADMIN", "APPROVED"] },
     });
     if (existingPending) {
-      return res
-        .status(400)
-        .json({ message: "You already have an active or pending loan." });
+      return res.status(400).json({ message: "You already have an active or pending loan." });
     }
 
+    // 4. Guarantor Validation
     const g1 = await Cooperator.findOne({ fileNumber: guarantor1FileNumber });
     const g2 = await Cooperator.findOne({ fileNumber: guarantor2FileNumber });
 
     if (!g1 || !g2) {
-      return res
-        .status(404)
-        .json({ message: "One or both guarantor file numbers are invalid." });
+      return res.status(404).json({ message: "One or both guarantor file numbers are invalid." });
     }
-    if (
-      g1._id.toString() === req.user._id.toString() ||
-      g2._id.toString() === req.user._id.toString()
-    ) {
-      return res
-        .status(400)
-        .json({ message: "You cannot guarantee your own loan." });
+    if (g1._id.toString() === req.user._id.toString() || g2._id.toString() === req.user._id.toString()) {
+      return res.status(400).json({ message: "You cannot guarantee your own loan." });
     }
 
-    const interestRate = 5; // 5% flat rate
+    // 5. Create Loan
+    const interestRate = 5; 
     const interestAmount = Math.round(amountInKobo * (interestRate / 100));
     const amountDue = amountInKobo + interestAmount;
 
     const newLoan = new Loan({
       cooperatorId: req.user._id,
       amountRequested: amountInKobo,
-      interestRate: interestRate,
-      amountDue: amountDue,
+      interestRate,
+      amountDue,
       guarantor1: { cooperatorId: g1._id },
       guarantor2: { cooperatorId: g2._id },
       status: "PENDING_GUARANTORS",
@@ -104,20 +87,10 @@ router.post("/request", protect, async (req, res) => {
 
     await newLoan.save();
 
-    sendGuarantorRequestEmail(
-      g1.email,
-      req.user.firstName,
-      amountInKobo,
-      newLoan._id,
-    );
-    sendGuarantorRequestEmail(
-      g2.email,
-      req.user.firstName,
-      amountInKobo,
-      newLoan._id,
-    );
+    // 6. Communications & Notifications
+    sendGuarantorRequestEmail(g1.email, req.user.firstName, amountInKobo, newLoan._id);
+    sendGuarantorRequestEmail(g2.email, req.user.firstName, amountInKobo, newLoan._id);
 
-    // Save persistent notifications to the database
     await Notification.create([
       {
         user: g1._id,
@@ -132,22 +105,6 @@ router.post("/request", protect, async (req, res) => {
         type: "info",
       },
     ]);
-
-    // Trigger Live WebSockets if the guarantors are online
-    const io = req.app.get("io");
-    const onlineUsers = req.app.get("onlineUsers");
-
-    if (io && onlineUsers) {
-      const g1Socket = onlineUsers.get(g1._id.toString());
-      const g2Socket = onlineUsers.get(g2._id.toString());
-
-      const liveMessage = `${req.user.firstName} just requested you as a loan guarantor.`;
-
-      if (g1Socket)
-        io.to(g1Socket).emit("new_guarantor_request", { message: liveMessage });
-      if (g2Socket)
-        io.to(g2Socket).emit("new_guarantor_request", { message: liveMessage });
-    }
 
     res.status(201).json({
       message: "Loan submitted. Waiting for guarantors to accept.",

@@ -11,14 +11,13 @@ import { protect } from "../middleware/authMiddleware.js";
 const router = express.Router();
 
 // ==========================================
-// 1. REGISTER LOGIC
+// 1. REGISTER LOGIC (Updated with Account Sync)
 // ==========================================
 router.post("/register", async (req, res) => {
   try {
     const { fileNumber, email, password, firstName, lastName, otherName } =
       req.body;
 
-    // Check if a user with this file number OR email already exists
     const existingUser = await Cooperator.findOne({
       $or: [{ email }, { fileNumber }],
     });
@@ -41,7 +40,7 @@ router.post("/register", async (req, res) => {
     });
     const savedCooperator = await newCooperator.save();
 
-    // Automatically create a blank financial account for the new user
+    // 🚀 FIXED: Automatically create a blank financial account for the new user
     const newAccount = new Account({
       cooperatorId: savedCooperator._id,
       totalSavings: 0,
@@ -64,17 +63,14 @@ router.post("/register", async (req, res) => {
 // ==========================================
 router.post("/login", async (req, res) => {
   try {
-    // Extract fileNumber instead of email from the frontend request
     const { fileNumber, password } = req.body;
 
-    // Search the database using the fileNumber
     const user = await Cooperator.findOne({ fileNumber }).select("+password");
     if (!user)
       return res.status(400).json({
         message: "Invalid credentials. Please check your ASCON File Number.",
       });
 
-    // Compare passwords
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch)
       return res
@@ -112,21 +108,35 @@ router.post("/login", async (req, res) => {
 });
 
 // ==========================================
-// 3. ALL MEMBERS
+// 3. EMERGENCY DATABASE SYNC (Fixes existing users)
 // ==========================================
-
-// @route   GET /api/auth/all-members
-// @desc    Get all registered cooperators (For Admin CRM)
-router.get("/all-members", async (req, res) => {
+router.get("/sync-database-accounts", protect, async (req, res) => {
   try {
-    // Fetch all users but DO NOT send their passwords
-    const users = await Cooperator.find()
-      .select("-password")
-      .sort({ createdAt: -1 });
-    res.status(200).json(users);
+    if (req.user.role !== "ADMIN" && req.user.role !== "SUPER_ADMIN") {
+      return res.status(403).json({ message: "Admin access required." });
+    }
+
+    const allCooperators = await Cooperator.find();
+    let createdCount = 0;
+
+    for (const cooperator of allCooperators) {
+      const existingAccount = await Account.findOne({
+        cooperatorId: cooperator._id,
+      });
+      if (!existingAccount) {
+        await Account.create({
+          cooperatorId: cooperator._id,
+          totalSavings: 0,
+          availableCreditLimit: 0,
+        });
+        createdCount++;
+      }
+    }
+    res.status(200).json({
+      message: `Database sync complete. Created ${createdCount} missing financial profiles.`,
+    });
   } catch (error) {
-    console.error("Fetch Users Error:", error);
-    res.status(500).json({ message: "Server error fetching members" });
+    res.status(500).json({ message: "Error during database sync." });
   }
 });
 
@@ -237,11 +247,9 @@ router.post("/forgot-password", async (req, res) => {
 
     const user = await Cooperator.findOne({ email });
     if (!user) {
-      return res
-        .status(200)
-        .json({
-          message: "If that email is registered, a reset link has been sent.",
-        });
+      return res.status(200).json({
+        message: "If that email is registered, a reset link has been sent.",
+      });
     }
 
     const resetToken = crypto.randomBytes(20).toString("hex");
@@ -258,11 +266,9 @@ router.post("/forgot-password", async (req, res) => {
 
     try {
       await sendPasswordResetEmail(user.email, user.firstName, resetUrl);
-      res
-        .status(200)
-        .json({
-          message: "If that email is registered, a reset link has been sent.",
-        });
+      res.status(200).json({
+        message: "If that email is registered, a reset link has been sent.",
+      });
     } catch (emailError) {
       user.resetPasswordToken = undefined;
       user.resetPasswordExpire = undefined;
