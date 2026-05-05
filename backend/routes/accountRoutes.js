@@ -42,12 +42,9 @@ router.post("/deposit", protect, async (req, res) => {
     const { amountInKobo } = req.body;
 
     if (!amountInKobo || amountInKobo <= 0 || !Number.isInteger(amountInKobo)) {
-      return res
-        .status(400)
-        .json({
-          message:
-            "Invalid deposit amount. Must be a positive integer in Kobo.",
-        });
+      return res.status(400).json({
+        message: "Invalid deposit amount. Must be a positive integer in Kobo.",
+      });
     }
 
     const userId = req.user.id || req.user._id;
@@ -61,13 +58,21 @@ router.post("/deposit", protect, async (req, res) => {
     account.availableCreditLimit = account.totalSavings * 2;
     await account.save();
 
-    // 🚀 NEW: Notify the user of their deposit
+    // Notify the user of their deposit
     await Notification.create({
       user: userId,
       title: "Deposit Successful",
       message: `Your deposit of ₦${(amountInKobo / 100).toLocaleString()} has been added to your savings.`,
       type: "financial",
     });
+
+    // 🚀 NEW: Ping the user's bell icon
+    const io = req.app.get("io");
+    const onlineUsers = req.app.get("onlineUsers");
+    if (io && onlineUsers) {
+      const targetSocket = onlineUsers.get(userId.toString());
+      if (targetSocket) io.to(targetSocket).emit("update_notifications");
+    }
 
     res.status(200).json({ message: "Deposit successful", account });
   } catch (error) {
@@ -129,13 +134,21 @@ router.post("/admin-adjust", protect, admin, async (req, res) => {
     account.availableCreditLimit = account.totalSavings * 2;
     await account.save();
 
-    // 🚀 NEW: Notify the user that an Admin adjusted their account
+    // Notify the user that an Admin adjusted their account
     await Notification.create({
       user: cooperatorId,
       title: "Admin Account Adjustment",
       message: `Your account was manually ${type === "CREDIT" ? "credited" : "debited"} by ₦${(amountInKobo / 100).toLocaleString()}.`,
       type: "financial",
     });
+
+    // 🚀 NEW: Ping the user's bell icon
+    const io = req.app.get("io");
+    const onlineUsers = req.app.get("onlineUsers");
+    if (io && onlineUsers) {
+      const targetSocket = onlineUsers.get(cooperatorId.toString());
+      if (targetSocket) io.to(targetSocket).emit("update_notifications");
+    }
 
     res.status(200).json({
       message: `Successfully ${type === "CREDIT" ? "credited" : "debited"} account.`,
@@ -225,9 +238,19 @@ router.post("/run-reconciliation", protect, admin, async (req, res) => {
       });
     }
 
-    // 🚀 NEW: Bulk insert all generated notifications to the database instantly
+    // Bulk insert all generated notifications to the database instantly
     if (notificationsToInsert.length > 0) {
       await Notification.insertMany(notificationsToInsert);
+      
+      // 🚀 NEW: Ping ALL affected users simultaneously
+      const io = req.app.get("io");
+      const onlineUsers = req.app.get("onlineUsers");
+      if (io && onlineUsers) {
+        notificationsToInsert.forEach(notif => {
+          const targetSocket = onlineUsers.get(notif.user.toString());
+          if (targetSocket) io.to(targetSocket).emit("update_notifications");
+        });
+      }
     }
 
     res.status(200).json({

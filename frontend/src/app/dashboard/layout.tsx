@@ -51,18 +51,49 @@ export default function DashboardLayout({
   // 🚀 NEW: Initialize the socket connection globally for the dashboard
   const socket = useSocket(user?._id || user?.id);
 
-  // 🚀 NEW: Listen for live events to update the notification bell red dot
+  // 🚀 NEW: Bulletproof Live Event Listener
   useEffect(() => {
     if (!socket) return;
 
-    const handleNewNotification = () => {
-      fetchNotifications(); // Silently refresh the list to trigger the bell
+    const fetchFreshNotifications = async () => {
+      try {
+        const token = localStorage.getItem("coop_token");
+        const res = await axios.get(
+          `${process.env.NEXT_PUBLIC_API_URL}/notifications`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+
+        const formattedNotifs = res.data.map((n: any) => {
+          const dateObj = new Date(n.createdAt);
+          return {
+            id: n._id,
+            title: n.title,
+            message: n.message,
+            time:
+              dateObj.toLocaleDateString() +
+              " " +
+              dateObj.toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              }),
+            unread: !n.isRead,
+            type: n.type || "info",
+          };
+        });
+
+        setNotifications(formattedNotifs);
+      } catch (error) {
+        console.error("Silent fetch failed", error);
+      }
     };
 
-    socket.on("new_guarantor_request", handleNewNotification);
+    // Listen for both generic updates and specific guarantor requests
+    socket.on("new_guarantor_request", fetchFreshNotifications);
+    socket.on("update_notifications", fetchFreshNotifications);
 
     return () => {
-      socket.off("new_guarantor_request", handleNewNotification);
+      socket.off("new_guarantor_request", fetchFreshNotifications);
+      socket.off("update_notifications", fetchFreshNotifications);
     };
   }, [socket]);
 
@@ -78,7 +109,7 @@ export default function DashboardLayout({
         email: parsedUser.email || "",
       });
       fetchNotifications();
-      fetchAccountData(); 
+      fetchAccountData();
     } else {
       router.push("/login");
     }
