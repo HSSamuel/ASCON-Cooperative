@@ -1,255 +1,528 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import axios from "axios";
-import toast from "react-hot-toast";
 
 export default function SavingsPage() {
   const [account, setAccount] = useState({
     totalSavings: 0,
     availableCreditLimit: 0,
+    customMonthlySavings: 0,
   });
-  const [depositAmount, setDepositAmount] = useState("");
+  const [activeLoansCount, setActiveLoansCount] = useState(0);
+  const [transactions, setTransactions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isDepositing, setIsDepositing] = useState(false);
-
-  const fetchAccountData = async () => {
-    try {
-      const token = localStorage.getItem("coop_token");
-      const res = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/account/my-account`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
-      setAccount(res.data);
-    } catch (error) {
-      console.error("Error fetching account data", error);
-      toast.error("Failed to load account details.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const [searchQuery, setSearchQuery] = useState("");
+  const [user, setUser] = useState<any>({
+    firstName: "Member",
+    lastName: "",
+    email: "",
+    fileNumber: "",
+    avatarUrl: "",
+  });
 
   useEffect(() => {
-    fetchAccountData();
+    const storedUser = localStorage.getItem("coop_user");
+    const token = localStorage.getItem("coop_token");
+
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+
+    const fetchAccountData = async () => {
+      try {
+        const config = { headers: { Authorization: `Bearer ${token}` } };
+        const [accountRes, loansRes, txnRes] = await Promise.all([
+          axios.get(
+            `${process.env.NEXT_PUBLIC_API_URL}/account/my-account`,
+            config,
+          ),
+          axios.get(
+            `${process.env.NEXT_PUBLIC_API_URL}/loans/my-loans`,
+            config,
+          ),
+          axios.get(
+            `${process.env.NEXT_PUBLIC_API_URL}/account/transactions`,
+            config,
+          ),
+        ]);
+
+        setAccount(accountRes.data);
+        setActiveLoansCount(
+          loansRes.data.filter((l: any) => l.status === "APPROVED").length,
+        );
+        setTransactions(txnRes.data);
+      } catch (error) {
+        console.error("Error fetching account data", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (token) fetchAccountData();
   }, []);
 
-  const handleDeposit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Convert the Naira input into an integer of Kobo for the backend
-    const amountInNaira = parseFloat(depositAmount);
-    if (isNaN(amountInNaira) || amountInNaira <= 0) {
-      toast.error("Please enter a valid deposit amount.");
-      return;
-    }
-    const amountInKobo = Math.round(amountInNaira * 100);
-
-    setIsDepositing(true);
-    try {
-      const token = localStorage.getItem("coop_token");
-      const res = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/account/deposit`,
-        { amountInKobo },
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-
-      toast.success("Deposit successful! Your balance has been updated.");
-      setDepositAmount(""); // Clear the form
-      setAccount(res.data.account); // Instantly update the UI with new balances
-    } catch (error: any) {
-      console.error("Deposit Error:", error);
-      toast.error(
-        error.response?.data?.message || "Failed to process deposit.",
-      );
-    } finally {
-      setIsDepositing(false);
-    }
-  };
-
-  const formatNaira = (koboAmount: number) => {
+  const formatNaira = (amount: number) => {
     return new Intl.NumberFormat("en-NG", {
-      style: "currency",
-      currency: "NGN",
       minimumFractionDigits: 2,
-    }).format(koboAmount / 100);
+      maximumFractionDigits: 2,
+    }).format(amount);
   };
+
+  const filteredTransactions = transactions.filter(
+    (txn) =>
+      txn.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (txn.effectiveMonth &&
+        txn.effectiveMonth.toLowerCase().includes(searchQuery.toLowerCase())),
+  );
 
   if (isLoading) {
     return (
-      <div className="animate-pulse grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div className="h-48 bg-slate-200 rounded-3xl"></div>
-        <div className="h-64 bg-slate-200 rounded-3xl"></div>
+      <div className="animate-pulse flex gap-6 h-[800px]">
+        <div className="w-1/3 bg-slate-200 rounded-sm"></div>
+        <div className="w-2/3 bg-slate-200 rounded-sm"></div>
       </div>
     );
   }
 
   return (
-    <div className="animate-fade-in-up pb-10 max-w-5xl mx-auto">
-      <div className="mb-8">
-        <h2 className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">
-          My Savings
-        </h2>
-        <p className="text-sm sm:text-base text-slate-500 mt-1">
-          Manage your cooperative funds and grow your credit limit.
-        </p>
-      </div>
+    <div className="animate-fade-in-up pb-10">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* LEFT COLUMN: NESTED PROFILE CARD */}
+        <div className="lg:col-span-4 flex flex-col shadow-sm border border-slate-200 bg-white rounded-sm overflow-hidden">
+          <div className="bg-[#2B2F42] pt-10 pb-8 px-6 flex flex-col items-center text-center text-white">
+            <div className="w-32 h-32 rounded-full border-4 border-white/10 overflow-hidden mb-4 bg-slate-700 flex items-center justify-center text-4xl font-bold">
+              {user.avatarUrl ? (
+                <img
+                  src={user.avatarUrl}
+                  alt="Profile"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                user.lastName?.charAt(0) || "U"
+              )}
+            </div>
+            <h2 className="text-xl font-semibold tracking-wide mb-1">
+              {user.firstName} {user.lastName}
+            </h2>
+            <p className="text-sm text-slate-300 mb-1">{user.email}</p>
+            <p className="text-sm text-slate-300 mb-6">
+              Membership No: <br />
+              <span className="font-bold text-lg">{user.fileNumber}</span>
+            </p>
+            <span className="px-5 py-1.5 bg-[#20C997] text-white text-xs font-bold rounded-sm uppercase tracking-wider">
+              Active
+            </span>
+          </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* LEFT COLUMN: THE BALANCE CARD */}
-        <div className="flex flex-col gap-6">
-          <div className="relative overflow-hidden rounded-3xl bg-slate-900 text-white shadow-2xl p-8 group border border-slate-800">
-            {/* Subtle background glow */}
-            <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl transform group-hover:scale-110 transition-transform duration-700 translate-x-1/3 -translate-y-1/3"></div>
+          <div className="flex flex-col bg-white">
+            <Link
+              href="/dashboard"
+              className="px-6 py-4 border-b border-slate-100 font-medium text-slate-600 hover:bg-slate-50 flex items-center gap-3"
+            >
+              <svg
+                className="w-5 h-5 text-slate-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                />
+              </svg>
+              Dashboard
+            </Link>
+            <div className="px-6 py-4 bg-slate-100 border-l-4 border-slate-400 font-semibold text-slate-700 flex items-center gap-3">
+              <svg
+                className="w-5 h-5 text-slate-500"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              Savings / Withdrawals
+            </div>
+            <Link
+              href="/dashboard/loans"
+              className="px-6 py-4 border-b border-slate-100 font-medium text-slate-600 hover:bg-slate-50 flex items-center gap-3"
+            >
+              <svg
+                className="w-5 h-5 text-slate-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
+              </svg>
+              Loan Transactions
+            </Link>
+            <Link
+              href="/dashboard/profile"
+              className="px-6 py-4 bg-white font-medium text-slate-600 hover:bg-slate-50 flex items-center gap-3"
+            >
+              <svg
+                className="w-5 h-5 text-slate-500"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                />
+              </svg>
+              Profile / Bio Data
+            </Link>
+          </div>
+        </div>
 
-            <div className="relative z-10">
-              <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center mb-6 backdrop-blur-md border border-white/5">
+        {/* RIGHT COLUMN: STATS & DATA TABLE */}
+        <div className="lg:col-span-8 flex flex-col gap-6">
+          {/* Top 3 Stat Cards */}
+          <div className="bg-[#2B2F42] p-6 rounded-sm grid grid-cols-1 sm:grid-cols-3 gap-6 shadow-md">
+            <div className="bg-white rounded-sm p-6 flex flex-col items-center justify-center text-center shadow-sm">
+              <div className="flex items-start justify-center gap-1 mb-2">
+                <span className="text-xl font-medium text-slate-500 mt-1">
+                  ₦
+                </span>
+                <h3 className="text-3xl font-bold text-slate-700 tracking-tight">
+                  {formatNaira(account.totalSavings / 100)}
+                </h3>
+              </div>
+              <p className="text-sm text-slate-500 italic">Account Balance</p>
+            </div>
+            <div className="bg-white rounded-sm p-6 flex flex-col items-center justify-center text-center shadow-sm">
+              <div className="flex items-start justify-center gap-1 mb-2">
+                <span className="text-xl font-medium text-slate-500 mt-1">
+                  ₦
+                </span>
+                <h3 className="text-3xl font-bold text-slate-700 tracking-tight">
+                  {formatNaira((account.customMonthlySavings || 1500000) / 100)}
+                </h3>
+              </div>
+              <p className="text-sm text-slate-500 italic">
+                Agreed Monthly Savings
+              </p>
+            </div>
+            <div className="bg-white rounded-sm p-6 flex flex-col items-center justify-center text-center shadow-sm">
+              <h3 className="text-3xl font-bold text-slate-700 tracking-tight mb-2">
+                {activeLoansCount}
+              </h3>
+              <p className="text-sm text-slate-500 italic">
+                Total no of Active Loans
+              </p>
+            </div>
+          </div>
+
+          {/* Savings Data Table Container */}
+          <div className="bg-white rounded-sm border border-slate-200 shadow-sm p-6">
+            <h3 className="text-2xl font-bold text-slate-700 text-center mb-6">
+              Savings
+            </h3>
+            {/* Table Controls (Updates top buttons) */}
+            <div className="flex flex-col xl:flex-row justify-between items-center mb-4 gap-4">
+              <div className="flex items-center gap-1 flex-wrap">
+                {/* 🚀 Updated 'Copy' button to ASCON Green */}
+                <button className="px-3 py-1 bg-[#1b5e3a] text-white text-xs font-semibold rounded-sm shadow-sm hover:opacity-90">
+                  Copy
+                </button>
+                <button className="px-3 py-1 bg-[#8B98A1] text-white text-xs font-semibold rounded-sm shadow-sm hover:opacity-90">
+                  CSV
+                </button>
+                <button className="px-3 py-1 bg-[#20C997] text-white text-xs font-semibold rounded-sm shadow-sm hover:opacity-90">
+                  Excel
+                </button>
+                <button className="px-3 py-1 bg-[#F39C12] text-white text-xs font-semibold rounded-sm shadow-sm hover:opacity-90">
+                  PDF
+                </button>
+                <button className="px-3 py-1 bg-[#00B5E2] text-white text-xs font-semibold rounded-sm shadow-sm hover:opacity-90">
+                  Print
+                </button>
+              </div>
+              {/* ... */}
+            </div>
+            {/* The Table Header Add Button */}
+            <th className="py-3 px-4 font-bold text-slate-700 text-center w-24">
+              {/* 🚀 Updated 'Add New' button to ASCON Green */}
+              <button className="bg-[#1b5e3a] text-white px-3 py-1.5 rounded-sm flex items-center justify-center gap-1 text-xs mx-auto w-full">
                 <svg
-                  className="w-6 h-6 text-emerald-400"
+                  className="w-3 h-3"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
-                  strokeWidth={2}
                 >
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
                   />
                 </svg>
-              </div>
-              <p className="text-slate-400 text-sm font-medium uppercase tracking-wider mb-2">
-                Total Available Savings
+                Add New
+              </button>
+            </th>
+            {/* Pagination */}
+            <div className="flex justify-between items-center mt-6 text-sm text-slate-600">
+              <p>
+                Showing 1 to {filteredTransactions.length} of{" "}
+                {filteredTransactions.length} Entries
               </p>
-              <h1 className="text-4xl font-extrabold tracking-tight mb-2">
-                {formatNaira(account.totalSavings)}
-              </h1>
-            </div>
-          </div>
-
-          {/* Educational Box */}
-          <div className="bg-emerald-50 rounded-2xl p-6 border border-emerald-100 flex items-start gap-4">
-            <div className="w-8 h-8 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </div>
-            <div>
-              <h4 className="text-sm font-bold text-slate-800">
-                Did you know?
-              </h4>
-              {/* 🚀 THE FIX: text-justify added here! */}
-              <p className="text-sm text-slate-600 mt-1 text-justify">
-                Your available credit limit automatically grows as you save. You
-                currently have access to{" "}
-                <span className="font-bold text-[#1b5e3a]">
-                  {formatNaira(account.availableCreditLimit)}
-                </span>{" "}
-                in loan requests.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* RIGHT COLUMN: DEPOSIT FORM */}
-        <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-xl shadow-slate-200/40 border border-slate-100 relative">
-          <h3 className="text-xl font-bold text-slate-800 mb-2">
-            Make a Deposit
-          </h3>
-          <p className="text-sm text-slate-500 mb-6">
-            Enter the amount you wish to add to your savings.
-          </p>
-
-          <form onSubmit={handleDeposit} className="space-y-6">
-            <div>
-              <label
-                htmlFor="amount"
-                className="block text-sm font-semibold text-slate-700 mb-1.5"
-              >
-                Amount (NGN)
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <span className="text-slate-500 font-bold">₦</span>
-                </div>
-                <input
-                  id="amount"
-                  type="number"
-                  step="0.01"
-                  min="1"
-                  required
-                  value={depositAmount}
-                  onChange={(e) => setDepositAmount(e.target.value)}
-                  placeholder="0.00"
-                  className="appearance-none block w-full pl-10 pr-4 py-3.5 border border-slate-200 rounded-xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1b5e3a]/20 focus:border-[#1b5e3a] sm:text-lg font-medium transition duration-200 bg-slate-50 focus:bg-white"
-                />
+              <div className="flex">
+                <button className="px-3 py-1 border border-slate-200 bg-slate-50 rounded-l-sm hover:bg-slate-100">
+                  Previous
+                </button>
+                {/* 🚀 Updated Active Pagination Page to ASCON Green */}
+                <button className="px-3 py-1 border-t border-b border-[#1b5e3a] bg-[#1b5e3a] text-white">
+                  1
+                </button>
+                <button className="px-3 py-1 border border-slate-200 bg-slate-50 rounded-r-sm hover:bg-slate-100">
+                  Next
+                </button>
               </div>
             </div>
-
-            <div className="pt-2">
-              <button
-                type="submit"
-                disabled={isDepositing}
-                className="w-full flex justify-center py-4 px-4 border border-transparent rounded-xl shadow-lg shadow-[#1b5e3a]/20 text-base font-bold text-white bg-[#1b5e3a] hover:bg-[#124228] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1b5e3a] transition-all duration-200 disabled:opacity-70 transform hover:-translate-y-0.5"
-              >
-                {isDepositing ? (
-                  <span className="flex items-center gap-2">
+            {/* The Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm whitespace-nowrap">
+                <thead>
+                  <tr className="border-b-2 border-slate-200">
+                    <th className="py-3 px-4 font-bold text-slate-700 w-12">
+                      #
+                    </th>
+                    <th className="py-3 px-4 font-bold text-slate-700 text-center w-24">
+                      <button className="bg-[#6A5AE0] text-white px-3 py-1.5 rounded-sm flex items-center justify-center gap-1 text-xs mx-auto w-full">
+                        <svg
+                          className="w-3 h-3"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 4v16m8-8H4"
+                          />
+                        </svg>
+                        Add New
+                      </button>
+                    </th>
+                    <th className="py-3 px-4 font-bold text-slate-700">
+                      EFFECTIVE
+                      <br />
+                      MONTH
+                    </th>
+                    <th className="py-3 px-4 font-bold text-slate-700">
+                      DESCRIPTION
+                    </th>
+                    <th className="py-3 px-4 font-bold text-slate-700 text-right">
+                      DEBIT
+                    </th>
+                    <th className="py-3 px-4 font-bold text-slate-700 text-right">
+                      CREDIT
+                    </th>
+                    <th className="py-3 px-4 font-bold text-slate-700">
+                      SHARED
+                      <br />
+                      CAPITAL
+                    </th>
+                    <th className="py-3 px-4 font-bold text-slate-700">
+                      DATE
+                      <br />
+                      MODIFIED
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredTransactions.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={8}
+                        className="py-8 text-center text-slate-500"
+                      >
+                        {searchQuery
+                          ? "No matching transactions found."
+                          : "No transactions recorded yet."}
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredTransactions.map((txn, index) => (
+                      <tr
+                        key={txn._id}
+                        className="border-b border-slate-100 hover:bg-slate-50"
+                      >
+                        <td className="py-3 px-4 text-slate-500">
+                          {index + 1}
+                        </td>
+                        <td className="py-3 px-4">
+                          <button className="bg-[#00B5E2] text-white px-3 py-1.5 rounded-sm flex items-center justify-center gap-1 text-xs mx-auto w-full">
+                            <svg
+                              className="w-3 h-3"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M4 6h16M4 12h16M4 18h16"
+                              />
+                            </svg>
+                            <svg
+                              className="w-3 h-3 ml-1"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M19 9l-7 7-7-7"
+                              />
+                            </svg>
+                          </button>
+                        </td>
+                        <td className="py-3 px-4 text-slate-600">
+                          {txn.effectiveMonth || "N/A"}
+                        </td>
+                        <td className="py-3 px-4 text-slate-600">
+                          {txn.description}
+                        </td>
+                        <td className="py-3 px-4 text-red-500 text-right font-medium">
+                          {txn.type === "DEBIT"
+                            ? formatNaira(txn.amount / 100)
+                            : ""}
+                        </td>
+                        <td className="py-3 px-4 text-slate-800 text-right font-bold">
+                          {txn.type === "CREDIT"
+                            ? formatNaira(txn.amount / 100)
+                            : ""}
+                        </td>
+                        <td className="py-3 px-4 text-slate-600"></td>
+                        <td className="py-3 px-4 text-slate-500 text-[11px] leading-tight">
+                          {new Date(txn.createdAt).toLocaleDateString()}
+                          <br />
+                          {new Date(txn.createdAt).toLocaleTimeString()}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {/* Pagination Placeholder */}
+            <div className="flex justify-between items-center mt-6 text-sm text-slate-600">
+              <p>
+                Showing 1 to {filteredTransactions.length} of{" "}
+                {filteredTransactions.length} Entries
+              </p>
+              <div className="flex">
+                <button className="px-3 py-1 border border-slate-200 bg-slate-50 rounded-l-sm hover:bg-slate-100">
+                  Previous
+                </button>
+                <button className="px-3 py-1 border-t border-b border-slate-200 bg-[#6A5AE0] text-white">
+                  1
+                </button>
+                <button className="px-3 py-1 border border-slate-200 bg-slate-50 rounded-r-sm hover:bg-slate-100">
+                  Next
+                </button>
+              </div>
+            </div>
+            {/* Bottom Summary Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8">
+              <div className="bg-[#f8f9fe] p-5 rounded-sm border border-slate-100">
+                <div className="flex items-center gap-3 mb-1">
+                  <div className="bg-purple-100 p-2 rounded-sm text-purple-600">
                     <svg
-                      className="animate-spin h-5 w-5 text-white"
-                      xmlns="http://www.w3.org/2000/svg"
+                      className="w-5 h-5"
                       fill="none"
                       viewBox="0 0 24 24"
+                      stroke="currentColor"
                     >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      ></circle>
                       <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
                     </svg>
-                    Processing Deposit...
-                  </span>
-                ) : (
-                  "Complete Deposit securely"
-                )}
-              </button>
-            </div>
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-700">
+                    ₦{formatNaira(account.totalSavings / 100)}
+                  </h3>
+                </div>
+                <p className="text-slate-500 text-sm font-medium ml-11">
+                  Total Saving
+                </p>
+              </div>
 
-            <p className="text-xs text-center text-slate-400 flex items-center justify-center gap-1.5 mt-4">
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                />
-              </svg>
-              Transactions are encrypted and secure.
-            </p>
-          </form>
+              <div className="bg-[#f8f9fe] p-5 rounded-sm border border-slate-100">
+                <div className="flex items-center gap-3 mb-1">
+                  <div className="bg-orange-100 p-2 rounded-sm text-orange-500">
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                      />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-700">₦0.00</h3>
+                </div>
+                <p className="text-slate-500 text-sm font-medium ml-11">
+                  Total Shared Capital
+                </p>
+              </div>
+
+              <div className="bg-[#f8f9fe] p-5 rounded-sm border border-slate-100">
+                <div className="flex items-center gap-3 mb-1">
+                  <div className="bg-red-100 p-2 rounded-sm text-red-500">
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+                      />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-700">₦0.00</h3>
+                </div>
+                <p className="text-slate-500 text-sm font-medium ml-11">
+                  Total Debit/ Withdrawal
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
