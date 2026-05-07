@@ -12,6 +12,10 @@ export default function ApplyForLoanPage() {
   // Form State
   const [loanType, setLoanType] = useState("REGULAR");
   const [amountRequested, setAmountRequested] = useState("");
+
+  const [guarantor1, setGuarantor1] = useState("");
+  const [guarantor2, setGuarantor2] = useState("");
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Account State (To enforce credit limits)
@@ -48,8 +52,10 @@ export default function ApplyForLoanPage() {
     }).format(amountInKobo / 100);
   };
 
-  // Live Math: Assuming the 10% monthly deduction rule from your backend
-  const requestedValueKobo = (parseInt(amountRequested) || 0) * 100;
+  // Live Math: ParseFloat and Math.round to prevent floating point errors
+  const requestedValueKobo = Math.round(
+    (parseFloat(amountRequested) || 0) * 100,
+  );
   const monthlyDeduction = requestedValueKobo * 0.1;
   const isOverLimit = requestedValueKobo > creditLimit;
 
@@ -66,22 +72,30 @@ export default function ApplyForLoanPage() {
       );
     }
 
+    if (!guarantor1 || !guarantor2) {
+      return toast.error("Two guarantors are strictly required.");
+    }
+    if (guarantor1 === guarantor2) {
+      return toast.error("You must provide two different guarantors.");
+    }
+
     setIsSubmitting(true);
     try {
       const token = localStorage.getItem("coop_token");
 
-      // Assumes you will create a POST /api/loans/apply route on your backend
       await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/loans/apply`,
+        `${process.env.NEXT_PUBLIC_API_URL}/loans/request`,
         {
           loanType,
-          amountRequested: requestedValueKobo,
+          amountInKobo: requestedValueKobo,
+          guarantor1FileNumber: guarantor1,
+          guarantor2FileNumber: guarantor2,
         },
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
       toast.success("Loan application submitted successfully!");
-      router.push("/dashboard/loans"); // Redirect back to the loan ledger
+      router.push("/dashboard/loans");
     } catch (error: any) {
       toast.error(
         error.response?.data?.message || "Failed to submit application.",
@@ -133,7 +147,7 @@ export default function ApplyForLoanPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* LEFT PANEL: The Application Form (Spans 8 columns) */}
+        {/* LEFT PANEL: The Application Form */}
         <div className="lg:col-span-8 bg-white rounded-sm border border-slate-200 shadow-sm p-8">
           <form onSubmit={handleSubmit} className="space-y-8">
             {/* 1. Loan Type Selection */}
@@ -166,12 +180,21 @@ export default function ApplyForLoanPage() {
                 ].map((type) => (
                   <label
                     key={type.id}
+                    onClick={() => setLoanType(type.id)}
                     className={`cursor-pointer border-2 rounded-sm p-4 transition-all ${
                       loanType === type.id
                         ? "border-[#1b5e3a] bg-emerald-50/50"
                         : "border-slate-100 hover:border-slate-300"
                     }`}
                   >
+                    <input
+                      type="radio"
+                      name="loanType"
+                      value={type.id}
+                      checked={loanType === type.id}
+                      onChange={() => setLoanType(type.id)}
+                      className="hidden"
+                    />
                     <div className="flex items-center gap-3">
                       <div
                         className={`w-5 h-5 rounded-full border flex items-center justify-center ${loanType === type.id ? "border-[#1b5e3a]" : "border-slate-300"}`}
@@ -198,10 +221,56 @@ export default function ApplyForLoanPage() {
 
             <hr className="border-slate-100" />
 
-            {/* 2. Amount Input */}
+            {/* 2. Guarantors Input Section */}
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-2">
-                2. Enter Requested Amount
+                2. Nominate Guarantors
+              </label>
+              <p className="text-xs text-slate-500 mb-4">
+                Enter the ASCON File Numbers of two cooperative members to
+                guarantee this facility.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    First Guarantor
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={guarantor1}
+                    onChange={(e) =>
+                      setGuarantor1(e.target.value.toUpperCase())
+                    }
+                    className="w-full px-4 py-3 border border-slate-300 rounded-sm text-sm focus:outline-none focus:border-[#1b5e3a] uppercase"
+                    placeholder="E.g. ASCON-042"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    Second Guarantor
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={guarantor2}
+                    onChange={(e) =>
+                      setGuarantor2(e.target.value.toUpperCase())
+                    }
+                    className="w-full px-4 py-3 border border-slate-300 rounded-sm text-sm focus:outline-none focus:border-[#1b5e3a] uppercase"
+                    placeholder="E.g. ASCON-089"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <hr className="border-slate-100" />
+
+            {/* 3. Amount Input */}
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">
+                3. Enter Requested Amount
               </label>
               <p className="text-xs text-slate-500 mb-4">
                 Your maximum available credit limit is{" "}
@@ -221,6 +290,7 @@ export default function ApplyForLoanPage() {
                   min="1000"
                   value={amountRequested}
                   onChange={(e) => setAmountRequested(e.target.value)}
+                  onWheel={(e) => (e.target as HTMLInputElement).blur()} // 🚀 THE FIX: Prevents scroll-wheel modifications
                   className={`w-full pl-10 pr-4 py-4 text-xl font-bold border-2 rounded-sm focus:outline-none transition-colors ${
                     isOverLimit
                       ? "border-red-300 focus:border-red-500 bg-red-50"
@@ -254,7 +324,13 @@ export default function ApplyForLoanPage() {
             <div className="pt-4 flex items-center gap-4">
               <button
                 type="submit"
-                disabled={isSubmitting || isOverLimit || !amountRequested}
+                disabled={
+                  isSubmitting ||
+                  isOverLimit ||
+                  !amountRequested ||
+                  !guarantor1 ||
+                  !guarantor2
+                }
                 className="bg-[#1b5e3a] hover:bg-[#124228] text-white px-8 py-3 rounded-sm font-bold shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {isSubmitting ? (
@@ -282,7 +358,7 @@ export default function ApplyForLoanPage() {
           </form>
         </div>
 
-        {/* RIGHT PANEL: Live Summary (Spans 4 columns) */}
+        {/* RIGHT PANEL: Live Summary */}
         <div className="lg:col-span-4 flex flex-col gap-6">
           <div className="bg-[#f8f9fe] border border-slate-200 rounded-sm overflow-hidden shadow-sm sticky top-6">
             <div className="bg-[#1b5e3a] px-6 py-4">
