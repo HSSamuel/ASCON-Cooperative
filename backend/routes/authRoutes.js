@@ -89,9 +89,16 @@ router.post("/login", async (req, res) => {
       expiresIn: "1d",
     });
 
+    // 🚀 FIX: Cross-Domain Cookie Configuration
+    res.cookie("coop_token", token, {
+      httpOnly: true,
+      secure: true, // MUST be true for cross-site cookies
+      sameSite: "none", // MUST be "none" to allow Netlify to send the cookie to Render
+      maxAge: 24 * 60 * 60 * 1000, // 1 day
+    });
+
     res.status(200).json({
       message: "Login successful",
-      token,
       user: {
         id: user._id,
         firstName: user.firstName,
@@ -101,7 +108,6 @@ router.post("/login", async (req, res) => {
         role: user.role,
         avatarUrl: user.avatarUrl,
         fileNumber: user.fileNumber,
-        // 🚀 THE FIX: We must explicitly send these fields back on login
         gender: user.gender,
         birthday: user.birthday,
         mobile: user.mobile,
@@ -113,6 +119,17 @@ router.post("/login", async (req, res) => {
     console.error("Login Error:", error);
     res.status(500).json({ message: "Server error during login" });
   }
+});
+
+// 🚀 NEW: Logout Route ensuring we target the exact same Cross-Domain configuration
+router.post("/logout", (req, res) => {
+  res.cookie("coop_token", "", {
+    httpOnly: true,
+    secure: true, // Must exactly match the login config to be destroyed
+    sameSite: "none", // Must exactly match the login config to be destroyed
+    expires: new Date(0), // Instantly expire the cookie
+  });
+  res.status(200).json({ message: "Logged out successfully" });
 });
 
 router.get("/all-members", async (req, res) => {
