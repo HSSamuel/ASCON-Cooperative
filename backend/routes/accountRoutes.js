@@ -202,6 +202,8 @@ router.post("/admin-adjust", protect, admin, async (req, res) => {
 });
 
 // @route   POST /api/account/run-reconciliation
+// @desc    Run automated monthly payroll deductions for Savings and Loans
+// @access  Private/Admin
 router.post("/run-reconciliation", protect, admin, async (req, res) => {
   try {
     const { standardSavingsKobo } = req.body;
@@ -230,7 +232,7 @@ router.post("/run-reconciliation", protect, admin, async (req, res) => {
 
       await account.save();
 
-      // Queue Transaction
+      // Queue Savings Transaction (CREDIT)
       transactionsToInsert.push({
         cooperatorId: account.cooperatorId,
         type: "CREDIT",
@@ -240,62 +242,76 @@ router.post("/run-reconciliation", protect, admin, async (req, res) => {
         balanceAfter: account.totalSavings,
       });
 
-      // Queue Notification
+      // Queue Savings Notification
       notificationsToInsert.push({
         user: account.cooperatorId,
         title: "Monthly Savings Deducted",
-        message: `Your monthly savings of ₦${(amountToSave / 100).toLocaleString()} has been successfully processed.`,
+        message: `Your monthly savings of ₦${(amountToSave / 100).toLocaleString('en-NG', { minimumFractionDigits: 2 })} has been successfully processed.`,
         type: "financial",
       });
     }
 
     // 2. DEDUCT ALL ACTIVE LOAN INSTALLMENTS
-    const activeLoans = await Loan.find({ status: "APPROVED" }).populate(
-      "cooperatorId",
-    );
+    const activeLoans = await Loan.find({ status: "APPROVED" }).populate("cooperatorId");
     let loansProcessed = 0;
 
     for (let loan of activeLoans) {
-      const userAccount = await Account.findOne({
-        cooperatorId: loan.cooperatorId._id,
-      });
+      const userAccount = await Account.findOne({ cooperatorId: loan.cooperatorId._id });
       if (userAccount && userAccount.status !== "ACTIVE") {
-        continue;
+        continue; // Skip deductions for inactive/suspended members
       }
 
       const targetRepayment = loan.amountDue || loan.amountRequested;
-      const monthlyInstallment = Math.round(targetRepayment * 0.1);
+      const monthlyInstallment = Math.round(targetRepayment * 0.1); // Assuming 10% monthly
 
       loan.amountRepaid += monthlyInstallment;
+      let isFullyRepaid = false;
 
       if (loan.amountRepaid >= targetRepayment) {
         loan.amountRepaid = targetRepayment;
         loan.status = "REPAID";
+        isFullyRepaid = true;
       }
 
       await loan.save();
       loansProcessed++;
 
+      // 🚀 TRANSPARENT LOAN DEBIT LOGGING
+      // Calculates exactly what the user owes after this deduction
+      const remainingBalance = targetRepayment - loan.amountRepaid;
+
+      // Queue Loan Transaction (DEBIT)
+      transactionsToInsert.push({
+        cooperatorId: loan.cooperatorId._id,
+        type: "DEBIT",
+        amount: monthlyInstallment,
+        description: `Automated Deduction: ${loan.loanType || 'Loan'} Repayment. Remaining Balance: ₦${(remainingBalance / 100).toLocaleString('en-NG', { minimumFractionDigits: 2 })}`,
+        effectiveMonth: currentMonth,
+        balanceAfter: userAccount.totalSavings, 
+      });
+
+      // Queue Loan Notification
       notificationsToInsert.push({
         user: loan.cooperatorId._id,
         title: "Loan Installment Processed",
-        message: `Your monthly loan deduction of ₦${(monthlyInstallment / 100).toLocaleString()} was processed.${loan.status === "REPAID" ? " Your loan is now fully repaid!" : ""}`,
+        message: `Your monthly loan deduction of ₦${(monthlyInstallment / 100).toLocaleString('en-NG', { minimumFractionDigits: 2 })} was processed.${isFullyRepaid ? " Your loan is now fully repaid!" : ""}`,
         type: "financial",
       });
     }
 
-    // Execute Bulk Inserts
+    // 3. EXECUTE BULK INSERTS TO MONGODB
     if (transactionsToInsert.length > 0) {
       await Transaction.insertMany(transactionsToInsert);
     }
-
+    
     if (notificationsToInsert.length > 0) {
       await Notification.insertMany(notificationsToInsert);
-
+      
+      // Emit live WebSocket events to all affected users currently online
       const io = req.app.get("io");
       const onlineUsers = req.app.get("onlineUsers");
       if (io && onlineUsers) {
-        notificationsToInsert.forEach((notif) => {
+        notificationsToInsert.forEach(notif => {
           const targetSocket = onlineUsers.get(notif.user.toString());
           if (targetSocket) io.to(targetSocket).emit("update_notifications");
         });

@@ -122,7 +122,7 @@ export default function ProfileBioDataPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* LEFT COLUMN: PROFILE CARD */}
         <div className="lg:col-span-4 flex flex-col shadow-sm border border-slate-200 bg-white rounded-sm overflow-hidden">
-          <div className="bg-[#2B2F42] pt-10 pb-8 px-6 flex flex-col items-center text-center text-white">
+          <div className="bg-[#1b5e3a] pt-10 pb-8 px-6 flex flex-col items-center text-center text-white">
             <div className="w-32 h-32 rounded-full border-4 border-white/10 overflow-hidden mb-4 bg-slate-700 flex items-center justify-center text-4xl font-bold">
               {user.avatarUrl ? (
                 <img
@@ -137,12 +137,14 @@ export default function ProfileBioDataPage() {
             <h2 className="text-xl font-semibold tracking-wide mb-1">
               {user.firstName} {user.lastName}
             </h2>
-            <p className="text-sm text-slate-300 mb-1">{user.email}</p>
-            <p className="text-sm text-slate-300 mb-6">
+            <p className="text-sm text-emerald-100/70 mb-1">{user.email}</p>
+            <p className="text-sm text-emerald-100/70 mb-6">
               Membership No: <br />
-              <span className="font-bold text-lg">{user.fileNumber}</span>
+              <span className="font-bold text-lg text-white">
+                {user.fileNumber}
+              </span>
             </p>
-            <span className="px-5 py-1.5 bg-[#20C997] text-white text-xs font-bold rounded-sm uppercase tracking-wider">
+            <span className="px-5 py-1.5 bg-[#20C997] text-white text-xs font-bold rounded-sm uppercase tracking-wider shadow-sm">
               Active
             </span>
           </div>
@@ -205,9 +207,9 @@ export default function ProfileBioDataPage() {
               </svg>
               Loan Transactions
             </Link>
-            <div className="px-6 py-4 bg-slate-100 border-l-4 border-slate-400 font-semibold text-slate-700 flex items-center gap-3">
+            <div className="px-6 py-4 bg-slate-100 border-l-4 border-[#1b5e3a] font-semibold text-slate-700 flex items-center gap-3">
               <svg
-                className="w-5 h-5 text-slate-500"
+                className="w-5 h-5 text-[#1b5e3a]"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -226,7 +228,8 @@ export default function ProfileBioDataPage() {
 
         {/* RIGHT COLUMN */}
         <div className="lg:col-span-8 flex flex-col gap-6">
-          <div className="bg-[#2B2F42] p-6 rounded-sm grid grid-cols-1 sm:grid-cols-3 gap-6 shadow-md">
+          {/* Top 3 Stat Cards */}
+          <div className="bg-[#1b5e3a] p-6 rounded-sm grid grid-cols-1 sm:grid-cols-3 gap-6 shadow-md border border-[#124228]">
             <div className="bg-white rounded-sm p-6 flex flex-col items-center justify-center text-center shadow-sm">
               <div className="flex items-start justify-center gap-1 mb-2">
                 <span className="text-xl font-medium text-slate-500 mt-1">
@@ -244,7 +247,7 @@ export default function ProfileBioDataPage() {
                   ₦
                 </span>
                 <h3 className="text-3xl font-bold text-slate-700 tracking-tight">
-                  {formatNaira((account.customMonthlySavings || 1500000) / 100)}
+                  {formatNaira((account.customMonthlySavings || 150000) / 100)}
                 </h3>
               </div>
               <p className="text-sm text-slate-500 italic">
@@ -261,58 +264,88 @@ export default function ProfileBioDataPage() {
             </div>
           </div>
 
+          {/* Bio Data Section */}
           <div className="bg-white rounded-sm border border-slate-200 shadow-sm p-8">
-            <h3 className="text-xl font-bold text-slate-700 mb-6 border-b border-slate-100 pb-4">
+            <h3 className="text-xl font-bold text-slate-800 mb-6 border-b border-slate-100 pb-4">
               Bio Data
             </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-6 gap-x-12 mb-8">
-              <div className="flex items-center">
-                <span className="w-32 text-sm text-slate-500">First Name</span>
-                <span className="text-sm font-semibold text-slate-800 flex-1">
-                  : {user.firstName}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-y-6 gap-x-8 mb-8">
+              {/* Perfectly Aligned 3-column Grid with break-all applied */}
+              <div className="grid grid-cols-[110px_10px_1fr] gap-2 items-start min-w-0">
+                <span className="text-sm font-medium text-slate-500">
+                  First Name
+                </span>
+                <span className="text-sm font-medium text-slate-400">:</span>
+                <span className="text-sm font-bold text-slate-800 break-words">
+                  {user.firstName}
                 </span>
               </div>
-              <div className="flex items-center">
-                <span className="w-32 text-sm text-slate-500">Last Name</span>
-                <span className="text-sm font-semibold text-slate-800 flex-1">
-                  : {user.lastName}
+              <div className="grid grid-cols-[110px_10px_1fr] gap-2 items-start min-w-0">
+                <span className="text-sm font-medium text-slate-500">
+                  Last Name
+                </span>
+                <span className="text-sm font-medium text-slate-400">:</span>
+                <span className="text-sm font-bold text-slate-800 break-words">
+                  {user.lastName}
                 </span>
               </div>
-              <div className="flex items-center">
-                <span className="w-32 text-sm text-slate-500">Gender</span>
-                <span className="text-sm font-semibold text-slate-800 flex-1">
-                  : {user.gender || "Not Provided"}
+
+              <div className="grid grid-cols-[110px_10px_1fr] gap-2 items-start min-w-0">
+                <span className="text-sm font-medium text-slate-500">
+                  Gender
+                </span>
+                <span className="text-sm font-medium text-slate-400">:</span>
+                <span className="text-sm font-bold text-slate-800 break-words">
+                  {user.gender || "Not Provided"}
                 </span>
               </div>
-              <div className="flex items-center">
-                <span className="w-32 text-sm text-slate-500">Birthday</span>
-                <span className="text-sm font-semibold text-slate-800 flex-1">
-                  : {formatDate(user.birthday)}
+              <div className="grid grid-cols-[110px_10px_1fr] gap-2 items-start min-w-0">
+                <span className="text-sm font-medium text-slate-500">
+                  Birthday
+                </span>
+                <span className="text-sm font-medium text-slate-400">:</span>
+                <span className="text-sm font-bold text-slate-800 break-words">
+                  {formatDate(user.birthday)}
                 </span>
               </div>
-              <div className="flex items-center">
-                <span className="w-32 text-sm text-slate-500">Occupation</span>
-                <span className="text-sm font-semibold text-slate-800 flex-1">
-                  : {user.occupation || `Staff (${user.role})`}
+
+              <div className="grid grid-cols-[110px_10px_1fr] gap-2 items-start min-w-0">
+                <span className="text-sm font-medium text-slate-500">
+                  Occupation
+                </span>
+                <span className="text-sm font-medium text-slate-400">:</span>
+                <span className="text-sm font-bold text-slate-800 break-words">
+                  {user.occupation || `Staff (${user.role})`}
                 </span>
               </div>
-              <div className="flex items-center">
-                <span className="w-32 text-sm text-slate-500">Email</span>
-                <span className="text-sm font-semibold text-slate-800 flex-1">
-                  : {user.email}
+              <div className="grid grid-cols-[110px_10px_1fr] gap-2 items-start min-w-0">
+                <span className="text-sm font-medium text-slate-500">
+                  Email
+                </span>
+                <span className="text-sm font-medium text-slate-400">:</span>
+                {/* 🚀 THE FIX: break-all forces long emails to wrap securely inside the box */}
+                <span className="text-sm font-bold text-slate-800 break-all">
+                  {user.email}
                 </span>
               </div>
-              <div className="flex items-center">
-                <span className="w-32 text-sm text-slate-500">Mobile</span>
-                <span className="text-sm font-semibold text-slate-800 flex-1">
-                  : {user.mobile || "Not Provided"}
+
+              <div className="grid grid-cols-[110px_10px_1fr] gap-2 items-start min-w-0">
+                <span className="text-sm font-medium text-slate-500">
+                  Mobile
+                </span>
+                <span className="text-sm font-medium text-slate-400">:</span>
+                <span className="text-sm font-bold text-slate-800 break-words">
+                  {user.mobile || "Not Provided"}
                 </span>
               </div>
-              <div className="flex items-center">
-                <span className="w-32 text-sm text-slate-500">Join Date</span>
-                <span className="text-sm font-semibold text-slate-800 flex-1">
-                  : {formatDate(user.dateJoined || user.createdAt)}
+              <div className="grid grid-cols-[110px_10px_1fr] gap-2 items-start min-w-0">
+                <span className="text-sm font-medium text-slate-500">
+                  Join Date
+                </span>
+                <span className="text-sm font-medium text-slate-400">:</span>
+                <span className="text-sm font-bold text-slate-800 break-words">
+                  {formatDate(user.dateJoined || user.createdAt)}
                 </span>
               </div>
             </div>
@@ -321,7 +354,7 @@ export default function ProfileBioDataPage() {
               <div className="flex gap-4">
                 <button
                   onClick={() => setIsEditModalOpen(true)}
-                  className="px-6 py-2.5 bg-[#6A5AE0] text-white text-sm font-semibold rounded-sm shadow-sm hover:opacity-90 flex items-center gap-2"
+                  className="px-6 py-2.5 bg-[#1b5e3a] hover:bg-[#124228] text-white text-sm font-semibold rounded-sm shadow-sm transition-colors flex items-center gap-2"
                 >
                   <svg
                     className="w-4 h-4"
@@ -342,8 +375,9 @@ export default function ProfileBioDataPage() {
             </div>
           </div>
 
+          {/* Login Activities Section */}
           <div className="bg-white rounded-sm border border-slate-200 shadow-sm p-6 flex items-center gap-6">
-            <div className="text-[#2B2F42]">
+            <div className="text-[#1b5e3a]">
               <svg
                 className="w-12 h-12"
                 fill="none"
@@ -359,7 +393,7 @@ export default function ProfileBioDataPage() {
               </svg>
             </div>
             <div>
-              <h3 className="text-xl font-bold text-slate-700 mb-1">
+              <h3 className="text-xl font-bold text-slate-800 mb-1">
                 Login Activities
               </h3>
               <p className="text-sm text-slate-500 font-medium">
@@ -376,7 +410,7 @@ export default function ProfileBioDataPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
           <div className="bg-white rounded-sm shadow-xl w-full max-w-lg overflow-hidden animate-fade-in-up">
             <div className="flex justify-between items-center p-4 border-b border-slate-100 bg-slate-50">
-              <h3 className="font-bold text-slate-700">Update Bio Data</h3>
+              <h3 className="font-bold text-slate-800">Update Bio Data</h3>
               <button
                 onClick={() => setIsEditModalOpen(false)}
                 className="text-slate-400 hover:text-slate-700"
@@ -518,7 +552,7 @@ export default function ProfileBioDataPage() {
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="px-6 py-2 bg-[#6A5AE0] text-white text-sm font-bold rounded-sm hover:opacity-90 transition-colors disabled:opacity-70"
+                  className="px-6 py-2 bg-[#1b5e3a] text-white text-sm font-bold rounded-sm hover:opacity-90 transition-colors disabled:opacity-70"
                 >
                   {isSaving ? "Saving..." : "Save Changes"}
                 </button>

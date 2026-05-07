@@ -19,7 +19,7 @@ export default function Home() {
                 alt="ASCON Logo"
                 width={36}
                 height={36}
-                cclassName="object-contain w-auto h-auto"
+                className="object-contain w-auto h-auto"
               />
               <div className="flex flex-col">
                 <span className="font-extrabold text-[10px] tracking-tight text-slate-500 uppercase leading-tight">
