@@ -1,5 +1,5 @@
 import express from "express";
-import { protect } from "../middleware/authMiddleware.js";
+import { protect, admin } from "../middleware/authMiddleware.js";
 import Notification from "../models/Notification.js";
 
 const router = express.Router();
@@ -69,6 +69,38 @@ router.delete("/:id", protect, async (req, res) => {
     res.json({ message: "Notification removed" });
   } catch (error) {
     res.status(500).json({ message: "Error deleting notification" });
+  }
+});
+
+// 🚀 NEW: Admin Direct Notice Hub Route
+// @route   POST /api/notifications/admin-send
+// @desc    Admin sends a direct notice to a user
+// @access  Private/Admin
+router.post("/admin-send", protect, admin, async (req, res) => {
+  try {
+    const { targetUserId, title, message, type } = req.body;
+
+    const notification = await Notification.create({
+      user: targetUserId,
+      title,
+      message,
+      type: type || "system",
+    });
+
+    // Trigger Live WebSocket so the user's bell turns red instantly
+    const io = req.app.get("io");
+    const onlineUsers = req.app.get("onlineUsers");
+    if (io && onlineUsers) {
+      const targetSocket = onlineUsers.get(targetUserId.toString());
+      if (targetSocket) io.to(targetSocket).emit("update_notifications");
+    }
+
+    res
+      .status(201)
+      .json({ message: "Notice dispatched successfully", notification });
+  } catch (error) {
+    console.error("Admin Notice Error:", error);
+    res.status(500).json({ message: "Error dispatching notification" });
   }
 });
 

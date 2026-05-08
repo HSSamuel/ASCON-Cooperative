@@ -5,11 +5,11 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import apiClient from "@/lib/axios";
-import toast from "react-hot-toast";
 import { useSocket } from "../../hooks/useSocket";
 import { useDispatch } from "react-redux";
 import { fetchFinancialData, clearFinanceData } from "../../store/financeSlice";
 import type { AppDispatch } from "../../store";
+import { ThemeToggle } from "@/components/ThemeToggle"; // <-- Added ThemeToggle Import
 
 export default function DashboardLayout({
   children,
@@ -42,7 +42,6 @@ export default function DashboardLayout({
       try {
         const res = await apiClient.get("/notifications");
 
-        // 🚀 THE FIX: Filter out Login and Logout notifications
         const formattedNotifs = res.data
           .filter(
             (n: any) =>
@@ -87,7 +86,6 @@ export default function DashboardLayout({
     if (storedUser) {
       setUser(JSON.parse(storedUser));
       fetchNotifications();
-
       dispatch(fetchFinancialData());
     } else {
       router.push("/login");
@@ -98,7 +96,6 @@ export default function DashboardLayout({
     try {
       const res = await apiClient.get("/notifications");
 
-      // 🚀 THE FIX: Filter out Login and Logout notifications
       const formattedNotifs = res.data
         .filter(
           (n: any) =>
@@ -139,11 +136,9 @@ export default function DashboardLayout({
   const handleToggleNotifications = async () => {
     setIsNotificationsOpen(!isNotificationsOpen);
 
-    // If we are opening the panel and there are unread notifications, clear them instantly
     if (!isNotificationsOpen && unreadCount > 0) {
       try {
         await apiClient.put("/notifications/read-all", {});
-        // Update local state to remove the red badge immediately
         setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
       } catch (error) {
         console.error("Failed to mark notifications as read", error);
@@ -178,14 +173,15 @@ export default function DashboardLayout({
   const unreadCount = notifications.filter((n) => n.unread).length;
 
   return (
-    <div className="min-h-screen bg-[#f8f9fe] flex overflow-hidden">
+    <div className="min-h-screen bg-[#f8f9fe] dark:bg-[#12121A] flex overflow-hidden transition-colors">
       {isSidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-sm lg:hidden transition-opacity"
+          className="fixed inset-0 z-40 bg-slate-900/60 dark:bg-slate-900/80 backdrop-blur-sm lg:hidden transition-opacity"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
 
+      {/* SIDEBAR (Kept its native deep green branding for both modes) */}
       <aside
         className={`fixed inset-y-0 left-0 z-50 bg-[#1b5e3a] text-white flex flex-col border-r border-[#124228] group overflow-hidden transition-all duration-300 ease-in-out flex-shrink-0
           w-72 lg:w-20 lg:hover:w-64 lg:sticky lg:top-0 lg:h-screen
@@ -302,11 +298,11 @@ export default function DashboardLayout({
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0 transition-all duration-300 h-screen overflow-y-auto relative">
-        <header className="sticky top-0 z-30 bg-white border-b border-slate-200 shadow-sm h-16 flex-shrink-0 px-4 sm:px-6 lg:px-8 flex items-center justify-between mx-4 mt-4 rounded-sm">
+        <header className="sticky top-0 z-30 bg-white dark:bg-[#1B1B25] border-b border-slate-200 dark:border-slate-800 shadow-sm h-16 flex-shrink-0 px-4 sm:px-6 lg:px-8 flex items-center justify-between mx-4 mt-4 rounded-sm transition-colors">
           <div className="flex items-center gap-4">
             <button
               onClick={() => setIsSidebarOpen(true)}
-              className="lg:hidden p-2 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors"
+              className="lg:hidden p-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
             >
               <svg
                 className="w-6 h-6"
@@ -322,23 +318,27 @@ export default function DashboardLayout({
                 />
               </svg>
             </button>
-            <h1 className="text-sm sm:text-base font-bold text-slate-700 tracking-tight hidden sm:block">
+            <h1 className="text-sm sm:text-base font-bold text-slate-700 dark:text-slate-200 tracking-tight hidden sm:block">
               ASCON Staff Multi-Purpose Cooperative
             </h1>
           </div>
 
-          <div className="flex items-center gap-4 sm:gap-6">
+          <div className="flex items-center gap-2 sm:gap-4">
+            {/* THEME TOGGLE */}
+            <ThemeToggle />
+
+            {/* NOTIFICATIONS */}
             <div className="relative">
               <button
                 onClick={handleToggleNotifications}
-                className="relative p-1 text-slate-400 hover:text-[#1b5e3a] transition-colors"
+                className="relative p-2 rounded-lg text-slate-400 dark:text-slate-500 hover:text-[#1b5e3a] dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
                 <svg
-                  className="w-6 h-6"
+                  className="w-5 h-5"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
-                  strokeWidth={1.5}
+                  strokeWidth={2}
                 >
                   <path
                     strokeLinecap="round"
@@ -346,8 +346,9 @@ export default function DashboardLayout({
                     d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"
                   />
                 </svg>
+                {/* 🚀 ENHANCED BADGE VISIBILITY */}
                 {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white border-2 border-white shadow-sm">
+                  <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white border-2 border-white dark:border-[#1B1B25] shadow-sm">
                     {unreadCount > 9 ? "9+" : unreadCount}
                   </span>
                 )}
@@ -359,42 +360,44 @@ export default function DashboardLayout({
                     className="fixed inset-0 z-40"
                     onClick={() => setIsNotificationsOpen(false)}
                   />
-                  <div className="absolute right-0 mt-3 w-80 bg-white rounded-sm shadow-xl border border-slate-200 overflow-hidden z-50 animate-fade-in-up">
-                    <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                      <h3 className="font-bold text-slate-700 text-sm">
+                  <div className="absolute right-0 mt-3 w-80 bg-white dark:bg-[#1B1B25] rounded-sm shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden z-50 animate-fade-in-up">
+                    <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-[#12121A]/50 flex justify-between items-center">
+                      <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm">
                         Notifications
                       </h3>
                     </div>
                     <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
                       {notifications.length === 0 ? (
-                        <div className="p-6 text-center text-slate-500 text-xs font-medium">
+                        <div className="p-6 text-center text-slate-500 dark:text-slate-400 text-xs font-medium">
                           No new notifications.
                         </div>
                       ) : (
                         notifications.slice(0, 5).map((notif) => (
                           <div
                             key={notif.id}
-                            className={`p-4 border-b border-slate-50 hover:bg-slate-50 transition-colors ${
-                              notif.unread ? "bg-slate-50/50" : ""
+                            className={`p-4 border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors ${
+                              notif.unread
+                                ? "bg-slate-50/50 dark:bg-emerald-900/10"
+                                : ""
                             }`}
                           >
                             <h4
-                              className={`text-xs ${notif.unread ? "font-bold text-slate-800" : "font-medium text-slate-600"}`}
+                              className={`text-xs ${notif.unread ? "font-bold text-slate-800 dark:text-slate-200" : "font-medium text-slate-600 dark:text-slate-400"}`}
                             >
                               {notif.title}
                             </h4>
-                            <p className="text-[10px] text-slate-500 line-clamp-2 mt-1">
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 line-clamp-2 mt-1">
                               {notif.message}
                             </p>
                           </div>
                         ))
                       )}
                     </div>
-                    <div className="p-3 text-center border-t border-slate-100 bg-slate-50">
+                    <div className="p-3 text-center border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-[#12121A]/50">
                       <Link
                         href="/dashboard/notifications"
                         onClick={() => setIsNotificationsOpen(false)}
-                        className="text-xs font-bold text-[#1b5e3a] hover:underline"
+                        className="text-xs font-bold text-[#1b5e3a] dark:text-emerald-400 hover:underline"
                       >
                         View all alerts
                       </Link>
@@ -404,21 +407,22 @@ export default function DashboardLayout({
               )}
             </div>
 
-            <div className="relative cursor-pointer hover:opacity-80 transition-opacity">
+            {/* PROFILE */}
+            <div className="relative cursor-pointer hover:opacity-80 transition-opacity pl-2">
               <Link
                 href="/dashboard/profile"
                 className="flex items-center gap-3"
               >
                 <div className="text-right hidden md:block">
-                  <p className="text-sm font-bold text-slate-800">
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
                     {user.firstName} {user.lastName}
                   </p>
-                  <p className="text-[10px] font-bold text-[#1b5e3a] uppercase tracking-widest">
+                  <p className="text-[10px] font-bold text-[#1b5e3a] dark:text-emerald-400 uppercase tracking-widest">
                     {user.role ? user.role.replace("_", " ") : "COOPERATOR"}
                   </p>
                 </div>
 
-                <div className="h-9 w-9 rounded-full bg-slate-200 border border-slate-300 shadow-sm overflow-hidden flex items-center justify-center font-bold text-slate-500 relative">
+                <div className="h-9 w-9 rounded-full bg-slate-200 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 shadow-sm overflow-hidden flex items-center justify-center font-bold text-slate-500 dark:text-slate-300 relative">
                   {user.avatarUrl ? (
                     <img
                       src={user.avatarUrl}
@@ -428,7 +432,7 @@ export default function DashboardLayout({
                   ) : (
                     user.lastName?.charAt(0) || "U"
                   )}
-                  <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-[#20C997] rounded-full border-2 border-white"></span>
+                  <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-[#20C997] rounded-full border-2 border-white dark:border-[#1B1B25]"></span>
                 </div>
               </Link>
             </div>
