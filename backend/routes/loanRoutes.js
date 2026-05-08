@@ -335,12 +335,10 @@ router.post("/:id/repay", protect, async (req, res) => {
     );
 
     if (!account) {
-      return res
-        .status(400)
-        .json({
-          message:
-            "Insufficient savings to process this repayment. Transaction aborted.",
-        });
+      return res.status(400).json({
+        message:
+          "Insufficient savings to process this repayment. Transaction aborted.",
+      });
     }
 
     const updatedLoan = await Loan.findOneAndUpdate(
@@ -449,6 +447,12 @@ router.put("/:id/guarantee", protect, async (req, res) => {
     if (isG1) loan.guarantor1.status = action;
     if (isG2) loan.guarantor2.status = action;
 
+    // 🚀 NEW: Fetch the name of the guarantor taking the action
+    const actingGuarantor = await Cooperator.findById(userId);
+    const guarantorName = actingGuarantor
+      ? `${actingGuarantor.firstName} ${actingGuarantor.lastName}`
+      : "A guarantor";
+
     if (
       loan.guarantor1.status === "ACCEPTED" &&
       loan.guarantor2.status === "ACCEPTED"
@@ -495,16 +499,16 @@ router.put("/:id/guarantee", protect, async (req, res) => {
       }
     } else if (action === "DECLINED") {
       loan.status = "REJECTED";
-      loan.adminComment =
-        "Rejected automatically: A guarantor declined the risk.";
+      loan.adminComment = `Rejected automatically: ${guarantorName} declined the risk.`;
     }
 
     await loan.save();
 
+    // 🚀 NEW: Notification includes the specific guarantor's name
     await Notification.create({
       user: loan.cooperatorId._id,
       title: `Guarantor ${action === "ACCEPTED" ? "Accepted" : "Declined"}`,
-      message: `A guarantor has ${action.toLowerCase()} your request.`,
+      message: `${guarantorName} has ${action.toLowerCase()} your loan request.`,
       type: action === "ACCEPTED" ? "success" : "danger",
     });
 

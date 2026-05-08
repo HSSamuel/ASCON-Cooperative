@@ -9,7 +9,7 @@ import { useSocket } from "../../hooks/useSocket";
 import { useDispatch } from "react-redux";
 import { fetchFinancialData, clearFinanceData } from "../../store/financeSlice";
 import type { AppDispatch } from "../../store";
-import { ThemeToggle } from "@/components/ThemeToggle"; // <-- Added ThemeToggle Import
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function DashboardLayout({
   children,
@@ -41,7 +41,6 @@ export default function DashboardLayout({
     const fetchFreshNotifications = async () => {
       try {
         const res = await apiClient.get("/notifications");
-
         const formattedNotifs = res.data
           .filter(
             (n: any) =>
@@ -95,7 +94,6 @@ export default function DashboardLayout({
   const fetchNotifications = async () => {
     try {
       const res = await apiClient.get("/notifications");
-
       const formattedNotifs = res.data
         .filter(
           (n: any) =>
@@ -127,22 +125,22 @@ export default function DashboardLayout({
     } catch (error) {
       console.error("Logout error", error);
     }
-
     localStorage.removeItem("coop_user");
     dispatch(clearFinanceData());
     router.push("/login");
   };
 
-  const handleToggleNotifications = async () => {
+  const handleToggleNotifications = () => {
     setIsNotificationsOpen(!isNotificationsOpen);
+  };
 
-    if (!isNotificationsOpen && unreadCount > 0) {
-      try {
-        await apiClient.put("/notifications/read-all", {});
-        setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
-      } catch (error) {
-        console.error("Failed to mark notifications as read", error);
-      }
+  // 🚀 NEW: Manual mark as read logic for the dropdown
+  const handleMarkAllRead = async () => {
+    try {
+      await apiClient.put("/notifications/read-all", {});
+      setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
+    } catch (error) {
+      console.error("Failed to mark read", error);
     }
   };
 
@@ -181,11 +179,8 @@ export default function DashboardLayout({
         />
       )}
 
-      {/* SIDEBAR (Kept its native deep green branding for both modes) */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 bg-[#1b5e3a] text-white flex flex-col border-r border-[#124228] group overflow-hidden transition-all duration-300 ease-in-out flex-shrink-0
-          w-72 lg:w-20 lg:hover:w-64 lg:sticky lg:top-0 lg:h-screen
-          ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}
+        className={`fixed inset-y-0 left-0 z-50 bg-[#1b5e3a] text-white flex flex-col border-r border-[#124228] group overflow-hidden transition-all duration-300 ease-in-out flex-shrink-0 w-72 lg:w-20 lg:hover:w-64 lg:sticky lg:top-0 lg:h-screen ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}
       >
         <div className="h-16 flex items-center justify-center px-4 border-b border-[#124228] flex-shrink-0 bg-white">
           <Link
@@ -218,16 +213,10 @@ export default function DashboardLayout({
                 key={item.name}
                 href={item.href}
                 onClick={() => setIsSidebarOpen(false)}
-                className={`flex items-center gap-4 px-6 py-3.5 transition-all duration-200 ${
-                  isActive
-                    ? "bg-white text-[#1b5e3a] font-bold shadow-sm"
-                    : "text-emerald-100/70 border-l-4 border-transparent hover:bg-white/10 hover:text-white font-medium"
-                }`}
+                className={`flex items-center gap-4 px-6 py-3.5 transition-all duration-200 ${isActive ? "bg-white text-[#1b5e3a] font-bold shadow-sm" : "text-emerald-100/70 border-l-4 border-transparent hover:bg-white/10 hover:text-white font-medium"}`}
               >
                 <svg
-                  className={`w-5 h-5 flex-shrink-0 transition-colors ${
-                    isActive ? "text-[#1b5e3a]" : "text-emerald-300/50"
-                  }`}
+                  className={`w-5 h-5 flex-shrink-0 transition-colors ${isActive ? "text-[#1b5e3a]" : "text-emerald-300/50"}`}
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -324,10 +313,8 @@ export default function DashboardLayout({
           </div>
 
           <div className="flex items-center gap-2 sm:gap-4">
-            {/* THEME TOGGLE */}
             <ThemeToggle />
 
-            {/* NOTIFICATIONS */}
             <div className="relative">
               <button
                 onClick={handleToggleNotifications}
@@ -346,9 +333,8 @@ export default function DashboardLayout({
                     d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"
                   />
                 </svg>
-                {/* 🚀 ENHANCED BADGE VISIBILITY */}
                 {unreadCount > 0 && (
-                  <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white border-2 border-white dark:border-[#1B1B25] shadow-sm">
+                  <span className="absolute top-1.5 right-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 text-[8px] font-bold text-white border-2 border-white dark:border-[#1B1B25] shadow-sm">
                     {unreadCount > 9 ? "9+" : unreadCount}
                   </span>
                 )}
@@ -365,6 +351,15 @@ export default function DashboardLayout({
                       <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm">
                         Notifications
                       </h3>
+                      {/* 🚀 NEW: Mark all as read button right in the dropdown */}
+                      {unreadCount > 0 && (
+                        <button
+                          onClick={handleMarkAllRead}
+                          className="text-[10px] font-bold text-[#1b5e3a] dark:text-emerald-400 hover:underline"
+                        >
+                          Mark all read
+                        </button>
+                      )}
                     </div>
                     <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
                       {notifications.length === 0 ? (
@@ -375,11 +370,7 @@ export default function DashboardLayout({
                         notifications.slice(0, 5).map((notif) => (
                           <div
                             key={notif.id}
-                            className={`p-4 border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors ${
-                              notif.unread
-                                ? "bg-slate-50/50 dark:bg-emerald-900/10"
-                                : ""
-                            }`}
+                            className={`p-4 border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors ${notif.unread ? "bg-slate-50/50 dark:bg-emerald-900/10" : ""}`}
                           >
                             <h4
                               className={`text-xs ${notif.unread ? "font-bold text-slate-800 dark:text-slate-200" : "font-medium text-slate-600 dark:text-slate-400"}`}
@@ -407,7 +398,6 @@ export default function DashboardLayout({
               )}
             </div>
 
-            {/* PROFILE */}
             <div className="relative cursor-pointer hover:opacity-80 transition-opacity pl-2">
               <Link
                 href="/dashboard/profile"
@@ -421,7 +411,6 @@ export default function DashboardLayout({
                     {user.role ? user.role.replace("_", " ") : "COOPERATOR"}
                   </p>
                 </div>
-
                 <div className="h-9 w-9 rounded-full bg-slate-200 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 shadow-sm overflow-hidden flex items-center justify-center font-bold text-slate-500 dark:text-slate-300 relative">
                   {user.avatarUrl ? (
                     <img

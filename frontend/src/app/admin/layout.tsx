@@ -25,7 +25,6 @@ export default function AdminLayout({
   const pathname = usePathname();
   const router = useRouter();
 
-  // 🚀 RESTORED NOTIFICATION STATES FOR ADMIN
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
 
@@ -116,19 +115,20 @@ export default function AdminLayout({
     }
 
     setAdminUser(user);
-    fetchNotifications(); // 🚀 Fetch immediately on load
+    fetchNotifications();
   }, [router]);
 
-  const handleToggleNotifications = async () => {
+  const handleToggleNotifications = () => {
     setIsNotificationsOpen(!isNotificationsOpen);
+  };
 
-    if (!isNotificationsOpen && unreadCount > 0) {
-      try {
-        await apiClient.put("/notifications/read-all", {});
-        setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
-      } catch (error) {
-        console.error("Failed to mark notifications as read", error);
-      }
+  // 🚀 NEW: Manual mark as read logic for the dropdown
+  const handleMarkAllRead = async () => {
+    try {
+      await apiClient.put("/notifications/read-all", {});
+      setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
+    } catch (error) {
+      console.error("Failed to mark read", error);
     }
   };
 
@@ -285,7 +285,6 @@ export default function AdminLayout({
           <div className="flex items-center gap-2 sm:gap-4">
             <ThemeToggle />
 
-            {/* 🚀 RESTORED NOTIFICATION BELL */}
             <div className="relative">
               <button
                 onClick={handleToggleNotifications}
@@ -305,7 +304,7 @@ export default function AdminLayout({
                   />
                 </svg>
                 {unreadCount > 0 && (
-                  <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white border-2 border-white dark:border-[#1B1B25] shadow-sm">
+                  <span className="absolute top-1.5 right-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 text-[8px] font-bold text-white border-2 border-white dark:border-[#1B1B25] shadow-sm">
                     {unreadCount > 9 ? "9+" : unreadCount}
                   </span>
                 )}
@@ -322,6 +321,15 @@ export default function AdminLayout({
                       <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm">
                         Notifications
                       </h3>
+                      {/* 🚀 ADDED MARK ALL READ TO DROPDOWN */}
+                      {unreadCount > 0 && (
+                        <button
+                          onClick={handleMarkAllRead}
+                          className="text-[10px] font-bold text-[#1b5e3a] dark:text-emerald-400 hover:underline"
+                        >
+                          Mark all read
+                        </button>
+                      )}
                     </div>
                     <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
                       {notifications.length === 0 ? (
