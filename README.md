@@ -1,58 +1,57 @@
 # ASCON Cooperative Management Platform
 
-An enterprise-grade, full-stack financial management and cooperative platform built for the ASCON Staff Multi-Purpose Co-operative Society Limited. This platform digitizes community savings, automated payroll deductions, loan processing, and administrative reconciliation.
+An enterprise-grade, full-stack financial management and cooperative platform built for the **ASCON Staff Multi-Purpose Co-operative Society Limited**. This platform digitizes community savings, automated payroll deductions, loan processing, and administrative reconciliation with a focus on strict risk management and real-time user engagement.
 
 ## 🚀 Key Features
 
-### 👤 Cooperator (User) Features
-* **Real-Time Dashboard:** Track total verified savings, available credit limits, and active loan statuses with an interactive UI.
-* **Automated Loan Engine:** Loan eligibility is automatically calculated based on the cooperative's strict risk-management rules.
-* **Guarantor System:** Request loan guarantees from fellow cooperators using their ASCON File Numbers. Guarantors receive real-time UI notifications (WebSockets) and email alerts to accept or decline the risk.
-* **Live Notifications:** Get instant alerts for account credits, loan approvals, and system broadcasts.
-* **Immutable Profile Records:** Official cooperative records (File Number, Date Joined) are locked to maintain financial integrity.
+### 👤 Cooperator (User) Experience
+* **Progressive Web App (PWA):** Fully installable on iOS, Android, and Desktop for a native app-like experience.
+* **Real-Time Dashboard:** Track total verified savings, available credit limits, and active loan statuses via an interactive UI powered by Recharts.
+* **Automated Loan Engine:** Loan eligibility and estimated monthly deductions are dynamically calculated based on the cooperative's global interest rates and maximum credit limits.
+* **Live Guarantor System:** Request loan guarantees from fellow cooperators using their ASCON File Numbers. Guarantors receive real-time UI notifications (via WebSockets) and secure email alerts (via MailerSend) to seamlessly accept or decline the risk.
+* **Immutable Profile Records:** Official cooperative records (File Number, Official Join Date) are locked and protected by the 6-Month Probation Rule for new members.
 
-### 🛡️ Admin & Risk Management Command Center
-* **360-Degree CRM Drawer:** A massive, desktop-class modal to view a cooperator's identity and financial ledger side-by-side.
-* **Manual Ledger Adjustments:** Easily credit or debit accounts for physical cash deposits or manual corrections.
-* **Reconciliation Engine Settings:** Pause or activate monthly automated payroll deductions for specific users, or set custom savings rates.
-* **Legacy Member Backdating:** Securely adjust the "Official Join Date" for legacy cooperators migrating to the digital platform.
-* **Credit Limit Override:** Board-approved power to manually bypass the 2x savings rule for special cases.
-* **System Audit Ledger:** Every admin action (overrides, loan approvals, ledger adjustments) is permanently logged to an immutable database table for complete transparency.
-* **Payroll Report Generation:** Export 1-click CSV files of outstanding loan balances for HR payroll processing.
+### 🛡️ Admin Command Center & Risk Management
+* **360-Degree CRM Modal:** A comprehensive, desktop-class drawer to view a cooperator's identity, communication logs, and financial ledger side-by-side.
+* **Manual Ledger Adjustments:** Granular control to credit or debit accounts for physical cash deposits, dividends, or manual corrections.
+* **Reconciliation Engine:** Pause or activate monthly automated payroll deductions for specific users, set custom savings rates, or run the global monthly deduction batch script.
+* **System Architecture Controls:** Board-approved power to dynamically adjust global interest rates, credit multipliers, or trigger a "Maintenance Mode" lockout.
+* **Immutable Audit Ledger:** Every administrative action (settings overrides, loan approvals, ledger adjustments) is permanently logged to an immutable database table for complete transparency.
+* **HR Payroll Export:** Generate 1-click CSV reports of outstanding loan balances and custom date-range queries for the HR payroll team.
 
-## ⚙️ Core Business Rules Enforced
-1. **The 2x Savings Rule:** A user's maximum credit limit is strictly calculated as `Total Verified Savings × 2`.
-2. **The 6-Month Probation:** New members must be active for 6 months before unlocking loan eligibility.
-3. **Single Active Loan:** Cooperators cannot request a new loan if they have an active/pending loan in the system.
-4. **Guarantor Independence:** A user cannot guarantee their own loan, and two *different* guarantors are strictly required.
+---
 
 ## 💻 Tech Stack
 
-**Frontend:**
-* [Next.js](https://nextjs.org/) (React Framework)
-* TypeScript
-* Tailwind CSS
-* Axios (Data Fetching)
-* React Hot Toast (Notifications)
-* Socket.io-client (Real-time updates)
+**Frontend (Client & SSR):**
+* **Framework:** Next.js 16 (App Router, running on Turbopack)
+* **Language:** TypeScript
+* **State Management:** Redux Toolkit (with Server-Side Hydration)
+* **Styling:** Tailwind CSS v4 & `next-themes` (Dark/Light Mode)
+* **Data Visualization:** Recharts
+* **Real-time:** `socket.io-client`
+* **PWA Engine:** `@ducanh2912/next-pwa`
 
-**Backend:**
-* [Node.js](https://nodejs.org/) & [Express.js](https://expressjs.com/)
-* MongoDB with Mongoose (Database & ORM)
-* Socket.io (WebSocket Server)
-* JSON Web Tokens (JWT) for secure Authentication
-* Nodemailer (Automated Emails & Magic Links)
+**Backend (API & WebSockets):**
+* **Environment:** Node.js & Express.js
+* **Database:** MongoDB with Mongoose ORM
+* **Real-time Server:** Socket.io (WebSocket Tunnel)
+* **Authentication:** JSON Web Tokens (JWT) secured via `HttpOnly` Cookies
+* **Email Service:** MailerSend API
+* **File Storage:** Cloudinary (Memory-buffer upload via Multer)
+
+---
 
 ## 🛠️ Local Development Setup
 
 ### Prerequisites
 * Node.js (v18 or higher)
-* MongoDB (Local instance or MongoDB Atlas URI)
+* MongoDB (Local instance or MongoDB Atlas Cluster)
 * Git
 
 ### 1. Clone the repository
 ```bash
-git clone [https://github.com/HSSamuel/ASCON-Cooperative.git]
+git clone [https://github.com/HSSamuel/ASCON-Cooperative.git](https://github.com/HSSamuel/ASCON-Cooperative.git)
 cd ascon-cooperative    
 
 ## Backend Setup
@@ -83,7 +82,13 @@ NEXT_PUBLIC_SOCKET_URL=http://localhost:5000
 
 
 📂 Project Architecture
-The platform utilizes a decoupled architecture. The Next.js frontend securely communicates with the Express REST API via JWT Bearer tokens. Live events (like guarantor requests) bypass standard HTTP polling and use a dedicated WebSocket tunnel for millisecond-level responsiveness.
+The platform utilizes a highly decoupled, modern architecture:
+
+Edge Protection: The Next.js frontend utilizes proxy.ts (Next.js Middleware) to intercept unauthorized access attempts at the edge before rendering.
+
+Hydration Sync: Financial data is fetched securely on the server and injected into the Redux store before the first paint, completely eliminating loading flickers.
+
+Event-Driven UI: Live events (like guarantor requests and admin notices) bypass standard HTTP polling and use a dedicated WebSocket tunnel for millisecond-level responsiveness.
 
 👨‍💻 Developer
 Developed and engineered by Samuel (Technical Design Consultant & Full-Stack Developer). Built to strictly enforce cooperative risk management while providing a premium, modern user experience.
