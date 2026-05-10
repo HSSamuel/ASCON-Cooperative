@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, Suspense } from "react";
-// 🚀 FIX: Import useSearchParams
 import { useRouter, useSearchParams } from "next/navigation";
 import apiClient from "@/lib/axios";
 import toast from "react-hot-toast";
 import Link from "next/link";
 import Image from "next/image";
+import { syncAuthCookie } from "../actions/auth";
 
 // 🚀 FIX: Extract the form logic into a sub-component so it can be wrapped in Suspense
 function LoginForm() {
@@ -18,51 +18,47 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    try {
-      const response = await apiClient.post("/auth/login", {
-        fileNumber,
-        password,
-      });
+ const handleLogin = async (e: React.FormEvent) => {
+   e.preventDefault();
+   setIsLoading(true);
+   try {
+     const response = await apiClient.post("/auth/login", {
+       fileNumber,
+       password,
+     });
 
-      // 1. Safety check to ensure the backend actually sent the token
-      const token = response.data.token;
-      if (!token) {
-        toast.error(
-          "Backend missing token. Ensure backend changes are deployed.",
-        );
-        setIsLoading(false);
-        return;
-      }
+     const token = response.data.token;
+     if (!token) {
+       toast.error("Backend missing token.");
+       setIsLoading(false);
+       return;
+     }
 
-      localStorage.setItem("coop_user", JSON.stringify(response.data.user));
+     // 🚀 Securely sync the token to Next.js SSR via Server Action
+     await syncAuthCookie(token);
 
-      // 2. Set the cookie explicitly
-      document.cookie = `coop_token=${token}; path=/; max-age=86400; Secure; SameSite=Lax`;
+     localStorage.setItem("coop_user", JSON.stringify(response.data.user));
+     toast.success("Welcome back!");
 
-      toast.success("Welcome back!");
+     const redirectUrl = searchParams.get("redirect");
 
-      const redirectUrl = searchParams.get("redirect");
-
-      // 3. USE window.location.href INSTEAD OF router.push()
-      if (redirectUrl) {
-        window.location.href = decodeURIComponent(redirectUrl);
-      } else if (
-        response.data.user.role === "ADMIN" ||
-        response.data.user.role === "SUPER_ADMIN"
-      ) {
-        window.location.href = "/admin";
-      } else {
-        window.location.href = "/dashboard";
-      }
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Invalid credentials.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+     // 🚀 Use window.location.href to force Next.js to read the new cookie on route load
+     if (redirectUrl) {
+       window.location.href = decodeURIComponent(redirectUrl);
+     } else if (
+       response.data.user.role === "ADMIN" ||
+       response.data.user.role === "SUPER_ADMIN"
+     ) {
+       window.location.href = "/admin";
+     } else {
+       window.location.href = "/dashboard";
+     }
+   } catch (err: any) {
+     toast.error(err.response?.data?.message || "Invalid credentials.");
+   } finally {
+     setIsLoading(false);
+   }
+ };
 
   return (
     <form className="space-y-5" onSubmit={handleLogin}>
