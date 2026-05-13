@@ -7,7 +7,7 @@ import Image from "next/image";
 import apiClient from "@/lib/axios";
 import { useSocket } from "../../hooks/useSocket";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { clearAuthCookie } from "../actions/auth";
+import { clearAuthCookieAndRedirect } from "@/app/actions/auth";
 
 export default function AdminLayout({
   children,
@@ -141,21 +141,20 @@ export default function AdminLayout({
     router.push("/dashboard");
   };
 
-  const handleLogout = async () => {
-    setIsLoggingOut(true);
-    try {
-      await apiClient.post("/auth/logout");
-    } catch (error) {
-      console.error("Logout error", error);
-    }
+const handleLogout = async () => {
+  setIsLoggingOut(true);
+  try {
+    await apiClient.post("/auth/logout");
+  } catch (error) {
+    console.error("Logout error", error);
+  }
 
-    localStorage.removeItem("coop_user");
-    localStorage.removeItem("coop_token_raw");
+  localStorage.removeItem("coop_user");
+  localStorage.removeItem("coop_token_raw");
 
-    await clearAuthCookie();
-
-    router.push("/login");
-  };
+  // 🚀 Let the Server Action handle BOTH the cookie wipe and the safe redirection!
+  await clearAuthCookieAndRedirect();
+};
 
   const navItems = [
     {

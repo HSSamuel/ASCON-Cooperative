@@ -10,7 +10,7 @@ import { useDispatch } from "react-redux";
 import { fetchFinancialData, clearFinanceData } from "../../store/financeSlice";
 import type { AppDispatch } from "../../store";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { clearAuthCookie } from "../actions/auth";
+import { clearAuthCookieAndRedirect } from "@/app/actions/auth";
 
 export default function DashboardClientLayout({
   children,
@@ -143,20 +143,20 @@ export default function DashboardClientLayout({
     }
   };
 
-  const handleLogout = async () => {
-    setIsLoggingOut(true);
-    try {
-      await apiClient.post("/auth/logout");
-    } catch (error) {
-      console.error("Logout error", error);
-    }
+const handleLogout = async () => {
+  setIsLoggingOut(true);
+  try {
+    await apiClient.post("/auth/logout");
+  } catch (error) {
+    console.error("Logout error", error);
+  }
 
-    localStorage.removeItem("coop_user");
-    localStorage.removeItem("coop_token_raw");
-    await clearAuthCookie();
-    dispatch(clearFinanceData());
-    router.push("/login");
-  };
+  localStorage.removeItem("coop_user");
+  localStorage.removeItem("coop_token_raw");
+
+  // 🚀 Let the Server Action handle BOTH the cookie wipe and the safe redirection!
+  await clearAuthCookieAndRedirect();
+};
 
   const handleToggleNotifications = () => {
     setIsNotificationsOpen(!isNotificationsOpen);

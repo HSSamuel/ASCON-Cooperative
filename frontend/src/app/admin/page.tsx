@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import apiClient from "@/lib/axios";
 import toast from "react-hot-toast";
 import Link from "next/link";
+import { GlobalSpinner } from "@/components/GlobalSpinner";
 
 export default function AdminOverviewPage() {
   const [loans, setLoans] = useState<any[]>([]);
@@ -277,7 +278,12 @@ export default function AdminOverviewPage() {
 
   if (isLoading) {
     return (
-      <div className="animate-pulse flex flex-col gap-6">
+      <div className="animate-pulse flex flex-col gap-6 relative">
+        {/* 🚀 Initial Data Loading Overlay */}
+        <GlobalSpinner
+          isLoading={true}
+          text="Initializing Admin Dashboard..."
+        />
         <div className="h-32 bg-slate-200 dark:bg-slate-800 rounded-sm"></div>
         <div className="h-64 bg-slate-200 dark:bg-slate-800 rounded-sm"></div>
       </div>
@@ -285,7 +291,13 @@ export default function AdminOverviewPage() {
   }
 
   return (
-    <div className="animate-fade-in-up pb-10">
+    <div className="animate-fade-in-up pb-10 relative">
+      {/* 🚀 Global Spinner for Loan Review Process */}
+      <GlobalSpinner
+        isLoading={processingId !== null}
+        text="Applying Administrative Review..."
+      />
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-[#2B2F42] rounded-sm p-6 shadow-sm text-white transition-colors">
           <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
@@ -612,14 +624,14 @@ export default function AdminOverviewPage() {
                             <button
                               onClick={() => handleReview(loan._id, "APPROVED")}
                               disabled={processingId === loan._id}
-                              className="bg-[#20C997] text-white px-3 py-1 text-xs rounded-sm hover:opacity-90"
+                              className="bg-[#20C997] text-white px-3 py-1 text-xs rounded-sm hover:opacity-90 disabled:opacity-50"
                             >
                               Approve
                             </button>
                             <button
                               onClick={() => handleReview(loan._id, "REJECTED")}
                               disabled={processingId === loan._id}
-                              className="bg-red-500 text-white px-3 py-1 text-xs rounded-sm hover:opacity-90"
+                              className="bg-red-500 text-white px-3 py-1 text-xs rounded-sm hover:opacity-90 disabled:opacity-50"
                             >
                               Reject
                             </button>

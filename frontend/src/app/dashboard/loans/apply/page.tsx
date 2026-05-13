@@ -8,6 +8,7 @@ import toast from "react-hot-toast";
 import { useDispatch } from "react-redux";
 import { fetchFinancialData } from "@/store/financeSlice";
 import type { AppDispatch } from "@/store";
+import { GlobalSpinner } from "@/components/GlobalSpinner";
 
 export default function ApplyForLoanPage() {
   const router = useRouter();
@@ -118,8 +119,7 @@ export default function ApplyForLoanPage() {
       toast.error(
         error.response?.data?.message || "Failed to submit application.",
       );
-    } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false); // Only toggle if failed to allow global overlay to hold during redirect
     }
   };
 
@@ -133,7 +133,13 @@ export default function ApplyForLoanPage() {
   }
 
   return (
-    <div className="animate-fade-in-up pb-10">
+    <div className="animate-fade-in-up pb-10 relative">
+      {/* 🚀 Global Spinner Overlay */}
+      <GlobalSpinner
+        isLoading={isSubmitting}
+        text="Submitting application..."
+      />
+
       <div className="mb-6 flex items-center gap-3">
         <Link
           href="/dashboard/loans"

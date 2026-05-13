@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import apiClient from "@/lib/axios";
 import toast from "react-hot-toast";
+import { GlobalSpinner } from "@/components/GlobalSpinner";
 
 export default function SystemSettingsPage() {
   const [isLoading, setIsLoading] = useState(true);
@@ -130,7 +131,12 @@ export default function SystemSettingsPage() {
   }
 
   return (
-    <div className="animate-fade-in-up pb-10">
+    <div className="animate-fade-in-up pb-10 relative">
+      <GlobalSpinner
+        isLoading={isSaving}
+        text="Synchronizing System Policy..."
+      />
+
       <div className="mb-6">
         <h2 className="text-xl font-bold text-slate-700 dark:text-slate-200">
           System Architecture
@@ -290,7 +296,7 @@ export default function SystemSettingsPage() {
               disabled={isSaving}
               className="w-full bg-[#1b5e3a] hover:bg-[#124228] text-white text-sm font-bold py-3.5 rounded-sm shadow-sm transition-colors disabled:opacity-70 flex items-center justify-center gap-2"
             >
-              {isSaving ? "Synchronizing Settings..." : "Apply Global Policy"}
+              Apply Global Policy
             </button>
           </form>
         </div>
