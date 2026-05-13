@@ -337,7 +337,7 @@ export default function AdminOverviewPage() {
           </div>
           <h2 className="text-lg font-bold mb-1">Targeted Payouts Active</h2>
           <p className="text-xs text-purple-200 mb-4">
-            Dividends are now distributed individually. Use the Member Directory
+            To distribute dividends individually, use the Member Directory
             to credit specific accounts.
           </p>
           <Link
