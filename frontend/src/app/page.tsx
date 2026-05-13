@@ -3,13 +3,16 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ThemeToggle } from "@/components/ThemeToggle"; // 🚀 Imported ThemeToggle
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { InstallPrompt } from "@/components/InstallPrompt";
 
 export default function Home() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-[#f8f9fe] dark:bg-[#12121A] font-sans transition-colors">
+      <InstallPrompt />
+
       {/* 1. SOLID ENTERPRISE NAVIGATION */}
       <nav className="fixed w-full z-50 bg-white dark:bg-[#1B1B25] border-b border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -27,7 +30,7 @@ export default function Home() {
                   ASCON
                 </span>
                 <span className="font-bold text-lg tracking-tight text-[#1b5e3a] dark:text-emerald-400 leading-tight">
-                  Co-operative
+                  Cooperative
                 </span>
               </div>
             </div>
