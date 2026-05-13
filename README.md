@@ -10,6 +10,8 @@ An enterprise-grade, full-stack financial management and cooperative platform bu
 * **Automated Loan Engine:** Loan eligibility and estimated monthly deductions are dynamically calculated based on the cooperative's global interest rates and maximum credit limits.
 * **Live Guarantor System:** Request loan guarantees from fellow cooperators using their ASCON File Numbers. Guarantors receive real-time UI notifications (via WebSockets) and secure email alerts (via MailerSend) to seamlessly accept or decline the risk.
 * **Immutable Profile Records:** Official cooperative records (File Number, Official Join Date) are locked and protected by the 6-Month Probation Rule for new members.
+* **Premium UX/UI Transitions:** Utilizes a centralized `<GlobalSpinner />` and Next.js `loading.tsx` to provide seamless, native-app-like frosted glass overlays during route changes, secure authentication, and data synchronization.
+* **Server-Action Security:** Implements robust Next.js Server Actions for secure `HttpOnly` cookie manipulation and strictly enforced, memory-flushing redirects upon user logout.
 
 ### 🛡️ Admin Command Center & Risk Management
 * **360-Degree CRM Modal:** A comprehensive, desktop-class drawer to view a cooperator's identity, communication logs, and financial ledger side-by-side.
@@ -63,10 +65,8 @@ PORT=5000
 MONGODB_URI=your_mongodb_connection_string
 JWT_SECRET=your_super_secure_jwt_secret
 FRONTEND_URL=http://localhost:3000
-EMAIL_HOST=your_smtp_host
-EMAIL_PORT=your_smtp_port
-EMAIL_USER=your_smtp_user
-EMAIL_PASS=your_smtp_password
+MAILERSEND_API_KEY=
+EMAIL_FROM=alerts@asconalumni.org
 
 # Start the backend server:
 npm run dev
@@ -91,4 +91,4 @@ Hydration Sync: Financial data is fetched securely on the server and injected in
 Event-Driven UI: Live events (like guarantor requests and admin notices) bypass standard HTTP polling and use a dedicated WebSocket tunnel for millisecond-level responsiveness.
 
 👨‍💻 Developer
-Developed and engineered by Samuel (Technical Design Consultant & Full-Stack Developer). Built to strictly enforce cooperative risk management while providing a premium, modern user experience.
+Developed and engineered by HUNSA S. Samuel (Admin Assistant | Graphic Design | Full-Stack Developer). Built to strictly enforce cooperative risk management while providing a premium, modern user experience.
