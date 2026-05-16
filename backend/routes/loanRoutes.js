@@ -91,7 +91,8 @@ router.post(
             availableCreditLimit: -(FORM_FEE_KOBO * 2),
           },
         },
-        { new: true, session },
+        // 🚀 FIX: Replaced { new: true } with { returnDocument: "after" }
+        { returnDocument: "after", session },
       );
 
       if (!account) {
@@ -439,7 +440,8 @@ router.post("/:id/repay", protect, validate(repaySchema), async (req, res) => {
           availableCreditLimit: -(actualRepayment * 2),
         },
       },
-      { new: true, session },
+      // 🚀 FIX: Replaced { new: true } with { returnDocument: "after" }
+      { returnDocument: "after", session },
     );
 
     if (!account) {
@@ -666,6 +668,48 @@ router.get("/payroll-report", protect, admin, async (req, res) => {
     res.status(200).send(csv);
   } catch (error) {
     res.status(500).json({ message: "Server error generating payroll report" });
+  }
+});
+
+// @route   GET /api/loans/guarantor-requests
+// @desc    Get only pending action requests
+router.get("/guarantor-requests", protect, async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id;
+    const requests = await Loan.find({
+      $or: [
+        { "guarantor1.cooperatorId": userId, "guarantor1.status": "PENDING" },
+        { "guarantor2.cooperatorId": userId, "guarantor2.status": "PENDING" },
+      ],
+    }).populate("cooperatorId", "firstName lastName fileNumber");
+
+    res.status(200).json(requests);
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Server error fetching guarantor requests" });
+  }
+});
+
+// 🚀 NEW: @route   GET /api/loans/my-guarantees
+// @desc    Get complete history of all guarantees (Active, Past, Declined)
+router.get("/my-guarantees", protect, async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id;
+    const guarantees = await Loan.find({
+      $or: [
+        { "guarantor1.cooperatorId": userId },
+        { "guarantor2.cooperatorId": userId },
+      ],
+    })
+      .populate("cooperatorId", "firstName lastName fileNumber")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(guarantees);
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Server error fetching complete guarantee history" });
   }
 });
 

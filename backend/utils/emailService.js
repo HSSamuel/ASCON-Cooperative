@@ -1,15 +1,9 @@
-import { MailerSend, EmailParams, Sender, Recipient } from "mailersend";
+import { google } from "googleapis";
 import dotenv from "dotenv";
 
 dotenv.config();
 
-// Initialize the MailerSend SDK
-const mailerSend = new MailerSend({
-  apiKey: process.env.MAILERSEND_API_KEY,
-});
-
-const senderEmail = process.env.EMAIL_FROM || "alerts@coop.asconalumni.org";
-const sentFrom = new Sender(senderEmail, "ASCON Cooperative");
+const OAuth2 = google.auth.OAuth2;
 
 // Helper to reliably grab the frontend URL
 const getFrontendUrl = () =>
@@ -17,30 +11,64 @@ const getFrontendUrl = () =>
   process.env.NEXT_PUBLIC_FRONTEND_URL ||
   "http://localhost:3000";
 
-// 1. Generic Send Function via MailerSend HTTP API (Bypasses Render Block)
+// 1. Setup the Gmail API Client (Bypasses Render's SMTP Block via Port 443)
+const createGmailClient = () => {
+  const oauth2Client = new OAuth2(
+    process.env.MAILER_CLIENT_ID,
+    process.env.MAILER_CLIENT_SECRET,
+    "https://developers.google.com/oauthplayground",
+  );
+
+  oauth2Client.setCredentials({
+    refresh_token: process.env.MAILER_REFRESH_TOKEN,
+  });
+
+  return google.gmail({ version: "v1", auth: oauth2Client });
+};
+
+// 2. Generic Send Function using Google API directly
 const sendEmail = async ({ to, subject, html }) => {
   try {
-    const recipients = [new Recipient(to)];
+    const gmail = createGmailClient();
 
-    const emailParams = new EmailParams()
-      .setFrom(sentFrom)
-      .setTo(recipients)
-      .setSubject(subject)
-      .setHtml(html);
+    // Construct an RFC 2822 formatted email string
+    const utf8Subject = `=?utf-8?B?${Buffer.from(subject).toString("base64")}?=`;
+    const messageParts = [
+      `From: "ASCON Cooperative" <${process.env.EMAIL_USER}>`,
+      `To: ${to}`,
+      `Content-Type: text/html; charset=utf-8`,
+      `MIME-Version: 1.0`,
+      `Subject: ${utf8Subject}`,
+      "",
+      html,
+    ];
+    const message = messageParts.join("\n");
 
-    await mailerSend.email.send(emailParams);
-    console.log(`✉️ MailerSend: Email securely dispatched to ${to}`);
-  } catch (error) {
-    // MailerSend attaches detailed error logs in the body
-    console.error(
-      `❌ MailerSend Error sending to ${to}:`,
-      error.body || error.message,
+    // The Gmail API requires a base64url encoded string
+    const encodedMessage = Buffer.from(message)
+      .toString("base64")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+
+    // Dispatch via HTTPS (Port 443) instead of SMTP
+    const res = await gmail.users.messages.send({
+      userId: "me",
+      requestBody: {
+        raw: encodedMessage,
+      },
+    });
+
+    console.log(
+      `✉️ Gmail HTTP API: Email securely dispatched to ${to} [ID: ${res.data.id}]`,
     );
+  } catch (error) {
+    console.error(`❌ Gmail API Error sending to ${to}:`, error.message);
     throw error;
   }
 };
 
-// 2. Pre-built HTML Templates for our specific actions
+// 3. Pre-built HTML Templates for our specific actions
 
 export const sendGuarantorRequestEmail = async (
   guarantorEmail,
